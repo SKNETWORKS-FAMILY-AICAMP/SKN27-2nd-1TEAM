@@ -14,7 +14,7 @@ def render():
     col_cm, col_fi = st.columns(2)
     
     with col_cm:
-        st.subheader("1. 혼동 행렬 (Confusion Matrix)")
+        st.subheader("혼동 행렬 (Confusion Matrix)")
         cm_df = pd.DataFrame(
             [["796 (TN)", "239 (FP)"], ["82 (FN)", "292 (TP)"]],
             columns=["예측: 유지(0)", "예측: 이탈(1)"],
@@ -23,7 +23,7 @@ def render():
         st.table(cm_df)
         
     with col_fi:
-        st.subheader("2. 변수 중요도 (Feature Importance)")
+        st.subheader("변수 중요도 (Feature Importance)")
         chart_data = pd.DataFrame(
             [0.85, 0.72, 0.65, 0.58, 0.45],
             index=['계약 형태', '가입 기간', '단기+고가', '인터넷 종류', '요금 비율'],

@@ -9,10 +9,10 @@ def render():
     model, encoder, scaler, model_columns = load_ml_objects()
     
     with st.container():
-        st.subheader("1. 고객 식별 정보")
+        st.subheader("고객 식별 정보")
         customer_name = st.text_input("고객명 (또는 Customer ID)", placeholder="예: 홍길동 또는 CUST-001")
         
-        st.subheader("2. 핵심 특성 입력 (정예 피처 기반)")
+        st.subheader("핵심 특성 입력")
         with st.form("churn_prediction_form"):
             col1, col2, col3 = st.columns(3)
             
