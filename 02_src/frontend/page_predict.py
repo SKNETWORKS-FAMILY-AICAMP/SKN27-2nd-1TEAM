@@ -84,9 +84,9 @@ def render():
 
             # ✅ Fix 2: 동적 로드한 optimal_threshold 사용 (기존 하드코딩 0.5551 제거)
             if prob >= optimal_threshold:
-                st.error(f" 고위험군: 적극적인 방어 마케팅이 필요합니다. (임계값: {optimal_threshold:.4f})")
+                st.error(f" 고위험군: 적극적인 방어 마케팅이 필요합니다.")
             else:
-                st.success(f" 안전군: 현재 관계 유지가 양호합니다. (임계값: {optimal_threshold:.4f})")
+                st.success(f" 안전군: 현재 관계 유지가 양호합니다.")
 
         except Exception as e:
             st.error(f" 예측 실패: {e}")
