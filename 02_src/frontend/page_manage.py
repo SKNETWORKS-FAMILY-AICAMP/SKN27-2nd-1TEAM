@@ -94,7 +94,7 @@ def render_customer_table(df: pd.DataFrame):
         # style.apply(강조) 먼저 -> format으로 % 문자열 표시
         st.dataframe(
             view_df.style.apply(highlight_risk, axis=1)
-                         .format({'이탈 확률': '{:.1f}%'}),
+                        .format({'이탈 확률': '{:.1f}%'}),
             use_container_width=True,
             height=460
         )

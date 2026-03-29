@@ -55,11 +55,11 @@ def create_engineered_features(input_df, model_columns=None):
 
     # 2. 서비스 카운트 기반 변수 (int64)
     internet_services = ['Online Security', 'Online Backup', 'Device Protection',
-                         'Tech Support', 'Streaming TV', 'Streaming Movies']
+                        'Tech Support', 'Streaming TV', 'Streaming Movies']
     df['Total_Internet_Services'] = (df[internet_services] == 'Yes').sum(axis=1).astype('int64')
     df['Total_Streaming']         = (df[['Streaming TV', 'Streaming Movies']] == 'Yes').sum(axis=1).astype('int64')
     df['Total_Security']          = (df[['Online Security', 'Online Backup',
-                                          'Device Protection', 'Tech Support']] == 'Yes').sum(axis=1).astype('int64')
+                                        'Device Protection', 'Tech Support']] == 'Yes').sum(axis=1).astype('int64')
 
     # 3. 요금 및 비율 변수 (float64)
     df['Extra_Charges']           = (df['Total Charges'] - (df['Monthly Charges'] * df['Tenure Months'])).astype('float64')
