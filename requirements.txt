@@ -13,3 +13,4 @@ streamlit-option-menu==0.3.13
 matplotlib==3.10.8
 seaborn==0.13.2
 jupyter==1.1.1
+wordcloud==1.9.6
