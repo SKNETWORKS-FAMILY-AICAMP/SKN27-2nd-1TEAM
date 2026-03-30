@@ -19,7 +19,6 @@ DISPLAY_COLS = {
 
 
 def predict_churn_proba(df: pd.DataFrame) -> pd.DataFrame:
-    """배치 예측: 이탈 확률 컬럼을 추가한 DataFrame 반환"""
     model, encoder, scaler, model_columns, _ = load_ml_objects()
     if model is None:
         return df
@@ -33,19 +32,14 @@ def predict_churn_proba(df: pd.DataFrame) -> pd.DataFrame:
             if processed[col].dtype != 'object':
                 processed[col] = pd.to_numeric(processed[col], errors='coerce').fillna(0)
 
-        encoded_data = encoder.transform(processed)
-
-        encoder_out_cols = []
-        for _, _, cols in encoder.transformers_:
-            if isinstance(cols, list):
-                encoder_out_cols.extend(cols)
-
-        encoded_df   = pd.DataFrame(encoded_data, columns=encoder_out_cols).astype('float64')
-        scaled_input = scaler.transform(encoded_df)
-        proba        = model.predict_proba(scaled_input)[:, 1]
+        # ✅ page_predict.py 방식으로 통일 (numpy array 그대로 활용)
+        encoded_data = encoder.transform(processed).astype('float64')  # ← DataFrame 재구성 제거
+        scaled_input = scaler.transform(encoded_data)                  # ← 바로 scaler에 넘김
+        
+        proba = model.predict_proba(scaled_input)[:, 1]
 
         result = df.copy()
-        result['이탈 확률'] = (proba * 100).round(1)   # 퍼센트로 변환
+        result['이탈 확률'] = (proba * 100).round(1)
         return result
 
     except Exception as e:
