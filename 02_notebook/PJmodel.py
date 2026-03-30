@@ -147,7 +147,7 @@ y_pred = model.predict_proba(X_test)[:,1]
 fpr, tpr, thresholds = roc_curve(y_test,y_pred)
 auc_te = auc(fpr, tpr)
 
-#피처 중요도
+#피처 중요도'
 df_feature_importances = pd.DataFrame(model.feature_importances_, X_train_over.columns).sort_values(by=[0], ascending=False).reset_index()
 
 import easydict
