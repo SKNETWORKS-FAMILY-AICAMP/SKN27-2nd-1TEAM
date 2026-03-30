@@ -4,11 +4,58 @@ import numpy as np
 import os
 from ml_utils import load_ml_objects, create_engineered_features
 
+import pymysql
+
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "00_data"))
 
+def get_db_connection():
+    try:
+        conn = pymysql.connect(
+            host='127.0.0.1',
+            port=3307,
+            user='root',
+            password='1234',
+            database='churn_db',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        return conn
+    except Exception as e:
+        st.error(f"DB 연결 실패: {e}")
+        return None
+
+def get_tables(conn):
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SHOW TABLES")
+            tables = cursor.fetchall()
+            return [list(t.values())[0] for t in tables]
+    except Exception as e:
+        st.error(f"테이블 조회 실패: {e}")
+        return []
+
 @st.cache_data(show_spinner=False)
-def get_batch_predictions(file_path):
-    df = pd.read_csv(file_path)
+def load_data_from_db(table_name):
+    conn = get_db_connection()
+    if not conn: return pd.DataFrame()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(f"SELECT * FROM `{table_name}`")
+            rows = cursor.fetchall()
+            df = pd.DataFrame(rows)
+            return df
+    except Exception as e:
+        st.error(f"데이터 로딩 실패: {e}")
+        return pd.DataFrame()
+    finally:
+        if conn:
+            conn.close()
+
+@st.cache_data(show_spinner=False)
+def get_batch_predictions(table_name):
+    df = load_data_from_db(table_name)
+    if df.empty:
+        return None
+        
     model, encoder, scaler, model_columns, optimal_threshold = load_ml_objects()
     if model is None:
         return None
@@ -54,9 +101,7 @@ def get_batch_predictions(file_path):
 
 def render():
     st.title("고객 데이터베이스 관리")
-    st.markdown("신규 고객 데이터를 업로드하거나, 현재 관리 중인 고객 목록의 위험률을 일괄 분석합니다.")
-    
-    # 차트를 최하단으로 이동
+    st.markdown("신규 고객 데이터를 업로드(로컬 저장)하거나, 원격 MySQL 데이터베이스(`churn_db`)에 적재된 고객 테이블 목록을 조회하여 분석합니다.")
     
     if not os.path.exists(DATA_DIR):
         try:
@@ -66,37 +111,35 @@ def render():
             return
             
     st.subheader("신규 데이터 일괄 업로드 (CSV)")
-    uploaded_file = st.file_uploader("배치(Batch) 예측을 수행할 CSV 파일을 선택하십시오.", type=["csv"])
-    
-    newly_uploaded_path = None
+    uploaded_file = st.file_uploader("로컬 데이터베이스 폴더에 추가할 CSV 파일을 선택하십시오.", type=["csv"])
     
     if uploaded_file is not None:
         file_path = os.path.join(DATA_DIR, uploaded_file.name)
         try:
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            st.success(f"파일이 성공적으로 서버에 적재되었습니다: {uploaded_file.name}")
-            newly_uploaded_path = file_path
+            st.success(f"파일이 성공적으로 로컬 스토리지에 적재되었습니다: {uploaded_file.name}")
         except Exception as e:
             st.error(f"파일 저장 오류: {e}")
-            
+
     st.markdown("---")
-    st.subheader("현재 관리 중인 고객 목록")
     
-    csv_files = [f for f in os.listdir(DATA_DIR) if f.endswith('.csv')] if os.path.exists(DATA_DIR) else []
-    
-    default_idx = 0
-    if newly_uploaded_path:
-        uploaded_name = os.path.basename(newly_uploaded_path)
-        if uploaded_name in csv_files:
-            default_idx = csv_files.index(uploaded_name)
+    # DB 연결 및 테이블 목록 가져오기
+    conn = get_db_connection()
+    db_tables = []
+    if conn:
+        db_tables = get_tables(conn)
+        conn.close()
+        
+    st.subheader("DB 데이터베이스 선택")
     
     selected_file = None
-    if csv_files:
-        st.markdown("로컬 스토리지에 적재된 데이터를 불러옵니다. (CSV 업로드 시 자동으로 해당 데이터가 선택됩니다.)")
-        selected_file = st.selectbox("조회할 데이터셋 선택", ["가짜 고객 데이터 (Mock)"] + csv_files, index=0 if not newly_uploaded_path else default_idx + 1)
+    if db_tables:
+        st.markdown("데이터베이스에 존재하는 테이블(데이터셋) 중 분석할 대상을 선택하십시오.")
+        selected_file = st.selectbox("조회할 DB 테이블 선택", ["가짜 고객 데이터 (Mock)"] + db_tables, index=0)
     else:
-        st.info("업로드된 CSV 파일이 없습니다. 데모용(Mock) 가짜 고객 데이터를 표시합니다.")
+        st.warning("데이터베이스(`churn_db`)에 테이블이 존재하지 않거나, 접속에 실패했습니다.")
+        st.info("대신 기본 제공되는 데모용(Mock) 가짜 고객 데이터를 표시합니다.")
         selected_file = "가짜 고객 데이터 (Mock)"
         
     def render_pie_chart(df):
@@ -180,8 +223,8 @@ def render():
         # 하단에 차트 삽입
         render_pie_chart(filtered_mock)
     else:
-        target_path = os.path.join(DATA_DIR, selected_file)
-        with st.spinner("빅데이터 기반 일괄 위험 여부 판별 중입니다. 잠시만 기다려주세요..."):
+        target_path = selected_file # DB 테이블 이름
+        with st.spinner(f"[{selected_file}] 테이블 기반 일괄 위험 여부 판별 중입니다. 잠시만 기다려주세요..."):
             ans_df = get_batch_predictions(target_path)
             
         if ans_df is not None:

@@ -4,9 +4,48 @@ import numpy as np
 import os
 from ml_utils import load_ml_objects, create_engineered_features
 
-@st.cache_data
-def load_csv_data(filepath):
-    return pd.read_csv(filepath)
+import pymysql
+
+def get_db_connection():
+    try:
+        conn = pymysql.connect(
+            host='127.0.0.1',
+            port=3307,
+            user='root',
+            password='1234',
+            database='churn_db',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        return conn
+    except Exception as e:
+        st.error(f"DB 연결 실패: {e}")
+        return None
+
+def get_tables(conn):
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SHOW TABLES")
+            tables = cursor.fetchall()
+            return [list(t.values())[0] for t in tables]
+    except Exception as e:
+        return []
+
+@st.cache_data(show_spinner=False)
+def load_data_from_db(table_name):
+    conn = get_db_connection()
+    if not conn: return pd.DataFrame()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(f"SELECT * FROM `{table_name}`")
+            rows = cursor.fetchall()
+            df = pd.DataFrame(rows)
+            return df
+    except Exception as e:
+        st.error(f"데이터 로딩 실패: {e}")
+        return pd.DataFrame()
+    finally:
+        if conn:
+            conn.close()
 
 def safe_index(options, value, default=0):
     if pd.isna(value): return default
@@ -25,21 +64,21 @@ def render():
         st.error("시스템 준비 중: 모델 구성 요소를 로드하지 못했습니다.")
         return
 
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "00_data"))
-    
-    csv_files = []
-    if os.path.exists(DATA_DIR):
-        csv_files = [f for f in os.listdir(DATA_DIR) if f.endswith('.csv')]
+    conn = get_db_connection()
+    db_tables = []
+    if conn:
+        db_tables = get_tables(conn)
+        conn.close()
         
-    if not csv_files:
-        st.warning("00_data 경로에 분석 가능한 CSV 파일이 없습니다. [고객 데이터 관리] 탭에서 데이터를 업로드하세요.")
+    if not db_tables:
+        st.warning("데이터베이스(`churn_db`)에 분석 가능한 테이블이 없습니다. 데이터를 먼저 적재하세요.")
         return
         
     with st.container():
         st.subheader("1. 시뮬레이션 대상 고객 선택")
         col_file, col_id, col_btn = st.columns([2, 2, 1])
         with col_file:
-            selected_file = st.selectbox("데이터셋(CSV)", csv_files)
+            selected_file = st.selectbox("데이터셋(DB 테이블)", db_tables)
         with col_id:
             customer_id = st.text_input("Customer ID 검색", placeholder="예: 3668-QPYBK")
         with col_btn:
@@ -66,9 +105,9 @@ def render():
             st.error("Customer ID를 입력해 주세요.")
             st.session_state["current_customer_df"] = None
         else:
-            file_path = os.path.join(DATA_DIR, selected_file)
+            target_table = selected_file
             try:
-                df = load_csv_data(file_path)
+                df = load_data_from_db(target_table)
                 id_col = None
                 for c in df.columns:
                     if c.lower() == 'customerid':
