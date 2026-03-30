@@ -79,4 +79,23 @@ def render():
                 st.success(f"안전군: 현재 관계 유지가 양호합니다. (임계값: {optimal_threshold:.4f})")
 
         except Exception as e:
+            import traceback
+            import os
+            # 로그 파일 절대 폴더 추적 기록
+            log_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "error_log.txt"))
+            
+            debug_info = traceback.format_exc() + "\n\n"
+            try:
+                debug_info += "=== processed_df.columns ===\n" + str(processed_df.columns.tolist()) + "\n\n"
+                debug_info += "=== processed_df.dtypes ===\n" + str(processed_df.dtypes) + "\n\n"
+                debug_info += "=== model_columns ===\n" + str(model_columns) + "\n\n"
+                if hasattr(encoder, 'transformers_'):
+                    debug_info += "=== encoder.transformers_ ===\n" + str(encoder.transformers_) + "\n\n"
+            except Exception as inner_e:
+                debug_info += f"Failed to dump variables: {inner_e}"
+                
+            with open(log_path, "w", encoding='utf-8') as f:
+                f.write(debug_info)
+                
             st.error(f"예측 실패: {e}")
+            st.info(f"디버깅을 위한 상세 에러 로그가 생성되었습니다. (저장 위치: {log_path})")
