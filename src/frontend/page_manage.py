@@ -39,7 +39,7 @@ def render():
             st.error(f"파일 저장 및 읽기 중 치명적 오류가 발생했습니다: {e}")
             
     st.markdown("---")
-    st.subheader("현재 관리 중인 고객 목록 (Sample View)")
+    st.subheader("현재 관리 중인 고객 목록")
     
     # 향후 00_data의 실제 데이터를 불러오는 로직으로 확장하기 위한 Placeholder
     mock_data = pd.DataFrame({
