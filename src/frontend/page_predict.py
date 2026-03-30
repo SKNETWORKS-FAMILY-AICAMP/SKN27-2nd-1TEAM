@@ -76,6 +76,42 @@ def render():
             # 동적 로드한 optimal_threshold 사용
             if prob >= optimal_threshold:
                 st.error(f"해당 고객은 이탈 위험 고객으로 적극적인 방어 마케팅이 필요합니다.")
+                
+                # --- [START] Prescriptive AI: 맞춤형 유지 엑션 추천 ---
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.subheader("💡 AI 맞춤형 리텐션(유지) 액션 추천")
+                st.markdown("현재 입력된 고객의 핵심 데이터 특성을 분석하여 도출된 최적의 방어 전략입니다.")
+                
+                actions = []
+                # 1. 계약 조건 분석
+                if contract == "Month-to-month":
+                    actions.append("🏷️ **단기 계약 리스크:** 매월 갱신되는 Month-to-month 계약 고객입니다. **약정 할인(1년/2년 계약) 프로모션 쿠폰**을 발송하여 즉각적인 락인(Lock-in)을 유도하세요.")
+                
+                # 2. 가입 기간 분석
+                if tenure < 12:
+                    actions.append("🌱 **초기 이탈 리스크:** 가입 1년 미만의 신규/초기 고객입니다. 서비스 불만이 쌓이기 전에 **온보딩 케어 안내 콜(Care Call) 배정 및 웰컴 패키지 혜택**을 제공하세요.")
+                    
+                # 3. 주요 부가서비스 부재 (Tech Support, Security)
+                if internet == "Fiber optic" and tech == "No":
+                    actions.append("👨‍💻 **기술 마찰 리스크:** 고가/고품질인 Fiber Optic 망을 쓰지만 '기술 지원(Tech Support)' 서비스가 없습니다. 장애 발생 시 가장 먼저 이탈하므로 **기술지원 부가서비스 3개월 무료 체험**을 권유하세요.")
+                elif internet != "No" and security == "No":
+                    actions.append("🛡️ **보안 서비스 부재:** 인터넷 가입자이나 통신망 '온라인 보안(Online Security)'에 미가입 상태입니다. **네트워크 보안 결합 특가 할인**으로 서비스 의존도를 높이세요.")
+                    
+                # 4. 요금 부담 분석
+                if monthly > 70.0:
+                    actions.append("💰 **요금 부담 리스크:** 최상위 구간에 속하는 높은 월 청구 요금($70 이상)을 내고 있습니다. 무리한 서비스보다 **데이터 이용량 맞춤형 요금제 하향 컨설팅이나 5% 청구 할인 쿠폰**을 제안하여 가격 민감도를 낮추세요.")
+                    
+                # 5. 시니어 고객 접근
+                if senior == 1:
+                    actions.append("👴 **시니어 특화 케어:** 고령자 고객군입니다. 복잡한 시스템이나 긴 ARS 대기줄 대신 **시니어 전용 직통 상담사 연결** 프로세스로 고객 만족도 최상급을 유지하세요.")
+                
+                if actions:
+                    for action in actions:
+                        st.info(action)
+                else:
+                    st.info("🎯 해당 고객은 뚜렷한 리스크 변수 지표가 보이지 않습니다. 종합적인 **일반 VIP 관리 유지 혜택(포인트 적립 등)**을 제안합니다.")
+                # --- [END] Prescriptive AI ---
+
             else:
                 st.success(f"해당 고객은 이탈 확률이 낮은 안전 고객입니다.")
 
