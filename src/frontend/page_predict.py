@@ -75,9 +75,9 @@ def render():
 
             # 동적 로드한 optimal_threshold 사용
             if prob >= optimal_threshold:
-                st.error(f"고위험군: 적극적인 방어 마케팅이 필요합니다.")
+                st.error(f"해당 고객은 이탈 위험 고객으로 적극적인 방어 마케팅이 필요합니다.")
             else:
-                st.success(f"안전군: 현재 관계 유지가 양호합니다.")
+                st.success(f"해당 고객은 이탈 확률이 낮은 안전 고객입니다.")
 
         except Exception as e:
             import traceback
