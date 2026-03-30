@@ -4,7 +4,7 @@ import os
 from ml_utils import load_ml_objects, create_engineered_features
 
 # ✅ Fix 3: 상대경로
-DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "00_data"))
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
 
 # 고객 목록 표시 컬럼 순서
 DISPLAY_COLS = {
@@ -94,7 +94,7 @@ def render_customer_table(df: pd.DataFrame):
         # style.apply(강조) 먼저 -> format으로 % 문자열 표시
         st.dataframe(
             view_df.style.apply(highlight_risk, axis=1)
-                        .format({'이탈 확률': '{:.1f}%'}),
+                         .format({'이탈 확률': '{:.1f}%'}),
             use_container_width=True,
             height=460
         )

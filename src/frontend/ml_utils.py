@@ -7,17 +7,21 @@ import streamlit as st
 # [전역 설정]
 # ✅ Fix 2: OPTIMAL_THRESHOLD 하드코딩 제거 → load_ml_objects()에서 pkl 동적 로드
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-SAVE_DIR    = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "03_saved_models"))
+SAVE_DIR    = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "model"))
 
 @st.cache_resource
 def load_ml_objects():
     try:
-        model     = joblib.load(os.path.join(SAVE_DIR, 'churn_stacking_model.pkl'))
+        model     = joblib.load(os.path.join(SAVE_DIR, 'churn_model.pkl'))
         encoder   = joblib.load(os.path.join(SAVE_DIR, 'target_encoder.pkl'))
-        scaler    = joblib.load(os.path.join(SAVE_DIR, 'scaler.pkl'))
-        columns   = joblib.load(os.path.join(SAVE_DIR, 'model_columns.pkl'))
+        scaler    = joblib.load(os.path.join(SAVE_DIR, 'churn_scaler.pkl'))
+        # feature_columns.txt: 한 줄에 컬럼명 하나 (txt 형식)
+        col_path  = os.path.join(SAVE_DIR, 'feature_columns.txt')
+        with open(col_path, 'r', encoding='utf-8') as f:
+            columns = [line.strip() for line in f if line.strip()]
         # ✅ Fix 2: pkl에서 실제 최적 임계값 로드 (기존 하드코딩 0.5551 → 실제값 0.4109)
-        threshold = joblib.load(os.path.join(SAVE_DIR, 'optimal_threshold.pkl'))
+        thresh_path = os.path.join(SAVE_DIR, 'optimal_threshold.pkl')
+        threshold   = joblib.load(thresh_path) if os.path.exists(thresh_path) else 0.3986
         return model, encoder, scaler, columns, threshold
     except Exception as e:
         st.error(f"⚠️ 모델 로드 실패: {e}")
@@ -55,11 +59,11 @@ def create_engineered_features(input_df, model_columns=None):
 
     # 2. 서비스 카운트 기반 변수 (int64)
     internet_services = ['Online Security', 'Online Backup', 'Device Protection',
-                        'Tech Support', 'Streaming TV', 'Streaming Movies']
+                         'Tech Support', 'Streaming TV', 'Streaming Movies']
     df['Total_Internet_Services'] = (df[internet_services] == 'Yes').sum(axis=1).astype('int64')
     df['Total_Streaming']         = (df[['Streaming TV', 'Streaming Movies']] == 'Yes').sum(axis=1).astype('int64')
     df['Total_Security']          = (df[['Online Security', 'Online Backup',
-                                        'Device Protection', 'Tech Support']] == 'Yes').sum(axis=1).astype('int64')
+                                          'Device Protection', 'Tech Support']] == 'Yes').sum(axis=1).astype('int64')
 
     # 3. 요금 및 비율 변수 (float64)
     df['Extra_Charges']           = (df['Total Charges'] - (df['Monthly Charges'] * df['Tenure Months'])).astype('float64')

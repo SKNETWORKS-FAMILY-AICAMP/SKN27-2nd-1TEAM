@@ -5,7 +5,7 @@ from streamlit_option_menu import option_menu
 
 # [핵심 아키텍처] 하위 모듈 경로 강제 주입
 current_dir = os.path.dirname(os.path.abspath(__file__))
-frontend_dir = os.path.join(current_dir, '02_src', 'frontend')
+frontend_dir = os.path.join(current_dir, 'src', 'frontend')
 
 if frontend_dir not in sys.path:
     sys.path.append(frontend_dir)
@@ -29,10 +29,9 @@ st.set_page_config(page_title="Telco Churn Analytics", layout="wide", initial_si
 # JS 차단 이슈 해결 및 파이썬 sleep() 병목 제거
 # -------------------------------------------------------------------------
 
-# 메인 로딩 로고 파일 경로 설정 (지정된 frontend/data 폴더 경로)
-LOGO_PATH = os.path.join(current_dir, '02_src', 'frontend', 'data', 'loading_logo.png')
-# 사이드바 서브 로고 파일 경로 설정 추가
-SIDEBAR_LOGO_PATH = os.path.join(current_dir, '02_src', 'frontend', 'data', 'sub_logo.png')
+# 로고 경로 (루트/assets/)
+LOGO_PATH         = os.path.join(current_dir, 'assets', 'loading_logo.png')
+SIDEBAR_LOGO_PATH = os.path.join(current_dir, 'assets', 'sub_logo.png')
 
 # 세션 상태 초기화: 앱 실행 시 최초 1회만 로딩 화면 구동
 if "has_loaded" not in st.session_state:
