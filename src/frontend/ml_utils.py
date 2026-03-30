@@ -13,7 +13,8 @@ import sklearn.utils._encode
 _original_check_unknown = sklearn.utils._encode._check_unknown
 
 def safe_check_unknown(values, known_values, return_mask=False):
-    valid_mask = np.in1d(values, known_values)
+    # Numpy 2.0+ 버전 호환 (in1d 대신 isin 사용)
+    valid_mask = np.isin(values, known_values)
     
     # 원본 코드의 if xp.any(xp.isnan(known_values)): 에서 발생하는 TypeError 차단
     try:
@@ -220,5 +221,18 @@ def create_engineered_features(input_df, model_columns=None):
                     df[col] = 'Unknown'
                 else:
                     df[col] = 0
+                    
+    # =========================================================================
+    # [TargetEncoder 버그 픽스 2]
+    # 모델 학습 당시에 Senior Citizen이 (0,1) 대신 ('No', 'Yes')로 변환되어 학습되었습니다.
+    # 예측 데이터프레임에서도 0은 'No', 1은 'Yes'로 변환해주어야 Numpy TargetEncoder 변환 시
+    # ValueError: invalid literal for int() with base 10: 'No' 에러를 막을 수 있습니다.
+    # =========================================================================
+    if 'Senior Citizen' in df.columns:
+        df['Senior Citizen'] = df['Senior Citizen'].map({
+            0: 'No', 1: 'Yes', 
+            '0': 'No', '1': 'Yes', 
+            'No': 'No', 'Yes': 'Yes'
+        }).fillna('No')
 
     return df

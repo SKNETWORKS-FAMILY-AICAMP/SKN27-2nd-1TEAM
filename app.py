@@ -106,6 +106,20 @@ if not st.session_state["has_loaded"] and modules_loaded and os.path.exists(LOGO
             0% {{ width: 0%; }}
             100% {{ width: 100%; }}
         }}
+        
+        /* 메인 페이지가 렌더링되면서 잠깐 깜빡이는 현상(FOUC) 원천 차단 */
+        /* 로딩 스크린이 유지되는 3.5초 동안은 실제 앱 요소들을 완전히 투명하게 숨김 */
+        [data-testid="stSidebar"],
+        [data-testid="stHeader"],
+        .block-container {{
+            opacity: 0;
+            animation: revealApp 0.5s ease-in 3.3s forwards; /* 3.3초 후부터 메인 앱 스무스하게 등장 */
+        }}
+
+        @keyframes revealApp {{
+            0% {{ opacity: 0; }}
+            100% {{ opacity: 1; }}
+        }}
     </style>
 
     <div id="loading-screen">
