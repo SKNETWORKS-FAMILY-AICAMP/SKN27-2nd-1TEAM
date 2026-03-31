@@ -1,51 +1,27 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os
 from ml_utils import load_ml_objects, create_engineered_features
+from db_utils import get_conn, get_tables, load_table, save_prediction
 
-import pymysql
 
-def get_db_connection():
-    try:
-        conn = pymysql.connect(
-            host='127.0.0.1',
-            port=3307,
-            user='root',
-            password='1234',
-            database='churn_db',
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        return conn
-    except Exception as e:
-        st.error(f"DB 연결 실패: {e}")
-        return None
-
-def get_tables(conn):
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SHOW TABLES")
-            tables = cursor.fetchall()
-            return [list(t.values())[0] for t in tables]
-    except Exception as e:
-        return []
-
-@st.cache_data(show_spinner=False)
 def load_data_from_db(table_name):
-    conn = get_db_connection()
-    if not conn: return pd.DataFrame()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(f"SELECT * FROM `{table_name}`")
-            rows = cursor.fetchall()
-            df = pd.DataFrame(rows)
-            return df
-    except Exception as e:
-        st.error(f"데이터 로딩 실패: {e}")
-        return pd.DataFrame()
-    finally:
-        if conn:
-            conn.close()
+    return load_table(table_name)
+
+
+def save_to_db(customer_id, churn_prob, optimal_threshold, sf):
+    save_prediction(
+        customer_id     = customer_id,
+        customer_name   = customer_id,
+        churn_prob      = churn_prob,
+        is_churn        = 1 if churn_prob >= optimal_threshold else 0,
+        contract        = sf.get('Contract', ''),
+        internet        = sf.get('Internet Service', ''),
+        monthly_charges = float(sf.get('Monthly Charges', 0)),
+        tenure_months   = int(sf.get('Tenure Months', 0)),
+        payment_method  = sf.get('Payment Method', ''),
+    )
+
 
 def safe_index(options, value, default=0):
     if pd.isna(value): return default
@@ -64,34 +40,38 @@ def render():
         st.error("시스템 준비 중: 모델 구성 요소를 로드하지 못했습니다.")
         return
 
-    conn = get_db_connection()
+    conn = get_conn()
     db_tables = []
     if conn:
-        db_tables = get_tables(conn)
+        db_tables = get_tables()
         conn.close()
-        
+
     if not db_tables:
         st.warning("데이터베이스(`churn_db`)에 분석 가능한 테이블이 없습니다. 데이터를 먼저 적재하세요.")
         return
-        
+
+    # ── 1. 고객 검색 ──────────────────────────────────
     with st.container():
         st.subheader("1. 시뮬레이션 대상 고객 선택")
         col_file, col_id, col_btn = st.columns([2, 2, 1])
         with col_file:
             selected_file = st.selectbox("데이터셋(DB 테이블)", db_tables)
         with col_id:
-            customer_id = st.text_input("Customer ID 검색", placeholder="예: 3668-QPYBK")
+            customer_id = st.text_input("Customer ID 검색", placeholder="일부만 입력해도 됩니다 (예: 3668)")
         with col_btn:
             st.write("")
             st.write("")
             search_clicked = st.button("고객 조회", use_container_width=True)
 
+    # 세션 초기화
     if "current_customer_df" not in st.session_state:
         st.session_state["current_customer_df"] = None
     if "searched_customer_id" not in st.session_state:
         st.session_state["searched_customer_id"] = None
     if "base_prob" not in st.session_state:
         st.session_state["base_prob"] = None
+    if "search_results" not in st.session_state:
+        st.session_state["search_results"] = None
 
     def get_prob(input_df):
         processed_df = create_engineered_features(input_df, model_columns=model_columns)
@@ -100,117 +80,169 @@ def render():
         scaled_input = scaler.transform(encoded_data)
         return model.predict_proba(scaled_input)[0, 1]
 
+    # ── 2. 검색 실행 ──────────────────────────────────
     if search_clicked:
         if not customer_id.strip():
             st.error("Customer ID를 입력해 주세요.")
-            st.session_state["current_customer_df"] = None
+            st.session_state["search_results"] = None
         else:
-            target_table = selected_file
             try:
-                df = load_data_from_db(target_table)
+                df = load_data_from_db(selected_file)
                 id_col = None
                 for c in df.columns:
-                    if c.lower() == 'customerid':
+                    if c == "CustomerID" or c.lower() == "customerid":
                         id_col = c
                         break
-                        
+
                 if id_col is None:
-                    st.error("선택한 데이터셋에 'Customer ID'를 나타내는 컬럼이 없습니다.")
-                    st.session_state["current_customer_df"] = None
+                    st.error("선택한 데이터셋에 'CustomerID' 컬럼이 없습니다.")
+                    st.session_state["search_results"] = None
                 else:
-                    cust_df = df[df[id_col] == customer_id.strip()].copy()
-                    
-                    if cust_df.empty:
-                        st.error(f"Customer ID '{customer_id}'를 찾을 수 없습니다.")
-                        st.session_state["current_customer_df"] = None
+                    # LIKE 검색 (한 글자도 OK)
+                    results = df[
+                        df[id_col].astype(str).str.contains(
+                            customer_id.strip(), case=False, na=False
+                        )
+                    ].copy()
+
+                    if results.empty:
+                        st.error(f"'{customer_id}' 에 해당하는 고객을 찾을 수 없습니다.")
+                        st.session_state["search_results"] = None
                     else:
-                        st.session_state["current_customer_df"] = cust_df.iloc[[0]].copy()
-                        st.session_state["searched_customer_id"] = customer_id.strip()
-                        prob = get_prob(st.session_state["current_customer_df"])
-                        st.session_state["base_prob"] = prob
-                        st.session_state["simulated_prob"] = prob
+                        st.session_state["search_results"] = results
+                        st.session_state["id_col"] = id_col
+                        # 세션 초기화
+                        st.session_state["current_customer_df"] = None
+                        st.session_state["base_prob"] = None
                         if "simulated_features" in st.session_state:
                             del st.session_state["simulated_features"]
-                        st.success("고객 정보를 성공적으로 불러왔습니다.")
             except Exception as e:
-                st.error(f"데이터셋 로드 중 오류 발생: {e}")
-                st.session_state["current_customer_df"] = None
+                st.error(f"검색 중 오류: {e}")
+                st.session_state["search_results"] = None
 
+    # ── 3. 검색 결과 목록 표시 + 선택 ────────────────
+    results = st.session_state.get("search_results")
+    if results is not None and not results.empty:
+        id_col = st.session_state.get("id_col")
+        st.markdown("---")
+
+        if len(results) == 1:
+            # 결과가 1명이면 바로 선택
+            selected_row = results.iloc[[0]]
+            st.success(f"고객 **{results.iloc[0][id_col]}** 을 찾았습니다.")
+            st.session_state["current_customer_df"] = selected_row
+            st.session_state["searched_customer_id"] = results.iloc[0][id_col]
+            prob = get_prob(selected_row)
+            st.session_state["base_prob"] = prob
+            st.session_state["simulated_prob"] = prob
+            if "simulated_features" in st.session_state:
+                del st.session_state["simulated_features"]
+        else:
+            # 여러 명이면 테이블에서 클릭해서 선택
+            st.info(f"**{len(results)}명**의 고객이 검색되었습니다. 행을 클릭해서 선택하세요.")
+
+            show_cols = [c for c in [id_col, 'Contract', 'Internet Service',
+                                      'Monthly Charges', 'Tenure Months', 'Churn Label']
+                         if c in results.columns]
+
+            # 체크박스 숨기고 행 클릭으로만 선택
+            selected = st.dataframe(
+                results[show_cols].reset_index(drop=True),
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="single-row",
+                hide_index=True,
+                column_config={
+                    "_index": None  # 인덱스 숨김
+                }
+            )
+
+            if selected and selected.selection.rows:
+                row_idx      = selected.selection.rows[0]
+                selected_row = results.iloc[[row_idx]]
+                selected_id  = selected_row.iloc[0][id_col]
+
+                if st.session_state.get("searched_customer_id") != selected_id:
+                    st.session_state["current_customer_df"]   = selected_row
+                    st.session_state["searched_customer_id"]  = selected_id
+                    st.session_state["base_prob"]             = get_prob(selected_row)
+                    st.session_state["simulated_prob"]        = st.session_state["base_prob"]
+                    if "simulated_features" in st.session_state:
+                        del st.session_state["simulated_features"]
+
+                st.success(f"✅ **{selected_id}** 선택됨 — 아래에서 시뮬레이션하세요.")
+
+    # ── 4. What-If 시뮬레이터 ─────────────────────────
     cust_df = st.session_state.get("current_customer_df")
     if cust_df is not None:
         st.markdown("---")
         st.subheader(f"💡 [ {st.session_state['searched_customer_id']} ] 고객 What-If 시뮬레이터")
         base_prob = st.session_state["base_prob"]
-        
+
         def get_val(col_name, default_val):
             for c in cust_df.columns:
                 if c.lower() == col_name.lower():
                     return cust_df[c].iloc[0]
             return default_val
-            
-        g_opts = ["Female", "Male"]
-        p_opts = ["No", "Yes"]
-        d_opts = ["No", "Yes"]
-        c_opts = ["Month-to-month", "One year", "Two year"]
+
+        g_opts  = ["Female", "Male"]
+        p_opts  = ["No", "Yes"]
+        d_opts  = ["No", "Yes"]
+        c_opts  = ["Month-to-month", "One year", "Two year"]
         pl_opts = ["Yes", "No"]
         pm_opts = ["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"]
         ph_opts = ["No", "Yes"]
-        l_opts = ["No", "Yes", "No phone service"]
+        l_opts  = ["No", "Yes", "No phone service"]
         i_opts  = ["Fiber optic", "DSL", "No"]
         s_opts  = ["No", "Yes", "No internet service"]
-        
-        init_senior = 1 if str(get_val("Senior Citizen", 0)).strip().lower() in ['yes', '1'] else 0
-        raw_tenure = get_val("Tenure Months", 12)
-        init_tenure = int(raw_tenure) if pd.notna(raw_tenure) else 12
-        raw_monthly = get_val("Monthly Charges", 70.0)
+
+        init_senior  = 1 if str(get_val("Senior Citizen", 0)).strip().lower() in ['yes', '1'] else 0
+        raw_tenure   = get_val("Tenure Months", 12)
+        init_tenure  = int(raw_tenure) if pd.notna(raw_tenure) else 12
+        raw_monthly  = get_val("Monthly Charges", 70.0)
         init_monthly = float(raw_monthly) if pd.notna(raw_monthly) else 70.0
-        raw_total = get_val("Total Charges", 800.0)
-        try:
-            init_total = float(str(raw_total).replace(' ',''))
-        except:
-            init_total = 0.0
 
-        with st.form("what_if_simulator"):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                gender   = st.selectbox("성별", g_opts, index=safe_index(g_opts, get_val("Gender", "Female")))
-                senior   = st.selectbox("고령자 여부", [0, 1], index=init_senior)
-                partner  = st.selectbox("배우자 유무", p_opts, index=safe_index(p_opts, get_val("Partner", "No")))
-                dep      = st.selectbox("부양가족 유무", d_opts, index=safe_index(d_opts, get_val("Dependents", "No")))
-                contract = st.selectbox("계약 형태", c_opts, index=safe_index(c_opts, get_val("Contract", "Month-to-month")))
+        # ── 고객 기본 정보 (읽기 전용) ────────────────
+        st.markdown("**📋 고객 기본 정보 (변경 불가)**")
+        gender  = str(get_val("Gender",     "Female"))
+        senior  = init_senior
+        partner = str(get_val("Partner",    "No"))
+        dep     = str(get_val("Dependents", "No"))
+        ri1, ri2, ri3, ri4 = st.columns(4)
+        ri1.text_input("성별",        value=gender,      disabled=True)
+        ri2.text_input("고령자 여부", value=str(senior), disabled=True)
+        ri3.text_input("배우자 유무", value=partner,     disabled=True)
+        ri4.text_input("부양가족",    value=dep,         disabled=True)
+
+        st.markdown("---")
+
+        # ── 2컬럼: 왼쪽=조절항목 / 오른쪽=결과 ───────
+        left_col, right_col = st.columns([1, 1])
+
+        with left_col:
+            st.markdown("**⚙️ 시뮬레이션 조절 항목**")
+            c1, c2 = st.columns(2)
+            with c1:
+                contract = st.selectbox("계약 형태",   c_opts,  index=safe_index(c_opts,  get_val("Contract","Month-to-month")))
                 tenure   = st.number_input("가입 기간(월)", 1, 100, init_tenure)
-            with col2:
+                phone    = st.selectbox("전화 서비스", ph_opts, index=safe_index(ph_opts, get_val("Phone Service","Yes")))
+                lines    = st.selectbox("다중 회선",   l_opts,  index=safe_index(l_opts,  get_val("Multiple Lines","No")))
+                internet = st.selectbox("인터넷",      i_opts,  index=safe_index(i_opts,  get_val("Internet Service","Fiber optic")))
+                security = st.selectbox("온라인 보안", s_opts,  index=safe_index(s_opts,  get_val("Online Security","No")))
+                backup   = st.selectbox("온라인 백업", s_opts,  index=safe_index(s_opts,  get_val("Online Backup","No")))
+            with c2:
                 monthly   = st.number_input("월 요금($)", 0.0, 200.0, init_monthly)
-                total     = st.number_input("총 요금($)", 0.0, 10000.0, init_total)
-                paperless = st.selectbox("전자청구서 사용", pl_opts, index=safe_index(pl_opts, get_val("Paperless Billing", "Yes")))
-                payment   = st.selectbox("결제 방식", pm_opts, index=safe_index(pm_opts, get_val("Payment Method", "Electronic check")))
-                phone     = st.selectbox("전화 서비스", ph_opts, index=safe_index(ph_opts, get_val("Phone Service", "Yes")))
-                lines     = st.selectbox("다중 회선", l_opts, index=safe_index(l_opts, get_val("Multiple Lines", "No")))
-            with col3:
-                internet  = st.selectbox("인터넷 서비스", i_opts, index=safe_index(i_opts, get_val("Internet Service", "Fiber optic")))
-                security  = st.selectbox("온라인 보안", s_opts, index=safe_index(s_opts, get_val("Online Security", "No")))
-                backup    = st.selectbox("온라인 백업", s_opts, index=safe_index(s_opts, get_val("Online Backup", "No")))
-                dev_prot  = st.selectbox("기기 보호", s_opts, index=safe_index(s_opts, get_val("Device Protection", "No")))
-                tech      = st.selectbox("기술 지원", s_opts, index=safe_index(s_opts, get_val("Tech Support", "No")))
-                tv        = st.selectbox("스트리밍 TV", s_opts, index=safe_index(s_opts, get_val("Streaming TV", "No")))
-                mov       = st.selectbox("스트리밍 영화", s_opts, index=safe_index(s_opts, get_val("Streaming Movies", "No")))
+                total     = round(monthly * tenure, 2)
+                st.info(f"총 요금: **${total:,.2f}**")
+                paperless = st.selectbox("전자청구서",  pl_opts, index=safe_index(pl_opts, get_val("Paperless Billing","Yes")))
+                payment   = st.selectbox("결제 방식",   pm_opts, index=safe_index(pm_opts, get_val("Payment Method","Electronic check")))
+                dev_prot  = st.selectbox("기기 보호",   s_opts,  index=safe_index(s_opts,  get_val("Device Protection","No")))
+                tech      = st.selectbox("기술 지원",   s_opts,  index=safe_index(s_opts,  get_val("Tech Support","No")))
+                tv        = st.selectbox("스트리밍 TV", s_opts,  index=safe_index(s_opts,  get_val("Streaming TV","No")))
+                mov       = st.selectbox("스트리밍 영화",s_opts, index=safe_index(s_opts,  get_val("Streaming Movies","No")))
 
-            submitted = st.form_submit_button("시뮬레이션 조절 요건 반영", type="primary", use_container_width=True)
-
-        if "simulated_features" not in st.session_state:
-            st.session_state["simulated_prob"] = base_prob
-            st.session_state["simulated_features"] = {
-                'Gender': get_val('Gender', 'Female'), 'Senior Citizen': init_senior, 'Partner': get_val('Partner', 'No'),
-                'Dependents': get_val('Dependents', 'No'), 'Tenure Months': init_tenure, 'Phone Service': get_val('Phone Service', 'Yes'),
-                'Multiple Lines': get_val('Multiple Lines', 'No'), 'Internet Service': get_val('Internet Service', 'Fiber optic'),
-                'Online Security': get_val('Online Security', 'No'), 'Online Backup': get_val('Online Backup', 'No'),
-                'Device Protection': get_val('Device Protection', 'No'), 'Tech Support': get_val('Tech Support', 'No'),
-                'Streaming TV': get_val('Streaming TV', 'No'), 'Streaming Movies': get_val('Streaming Movies', 'No'),
-                'Contract': get_val('Contract', 'Month-to-month'), 'Paperless Billing': get_val('Paperless Billing', 'Yes'),
-                'Payment Method': get_val('Payment Method', 'Electronic check'), 'Monthly Charges': init_monthly, 'Total Charges': init_total
-            }
-
-        if submitted:
+        with right_col:
+            # 실시간 확률 계산
             sim_input = pd.DataFrame([{
                 'Gender': gender, 'Senior Citizen': senior, 'Partner': partner,
                 'Dependents': dep, 'Tenure Months': tenure, 'Phone Service': phone,
@@ -221,84 +253,71 @@ def render():
                 'Contract': contract, 'Paperless Billing': paperless,
                 'Payment Method': payment, 'Monthly Charges': monthly, 'Total Charges': total
             }])
-            
+
             try:
-                with st.spinner("시뮬레이션 분석 중..."):
-                    sim_prob = get_prob(sim_input)
-                    st.session_state["simulated_prob"] = sim_prob
-                    st.session_state["simulated_features"] = {
-                        'Gender': gender, 'Senior Citizen': senior, 'Partner': partner,
-                        'Dependents': dep, 'Tenure Months': tenure, 'Phone Service': phone,
-                        'Multiple Lines': lines, 'Internet Service': internet,
-                        'Online Security': security, 'Online Backup': backup,
-                        'Device Protection': dev_prot, 'Tech Support': tech,
-                        'Streaming TV': tv, 'Streaming Movies': mov,
-                        'Contract': contract, 'Paperless Billing': paperless,
-                        'Payment Method': payment, 'Monthly Charges': monthly, 'Total Charges': total
-                    }
-                    st.success("시뮬레이션 분석 완료!")
+                sim_prob = get_prob(sim_input)
             except Exception as e:
-                import traceback
                 st.error(f"예측 실패: {e}")
-                st.info(f"디버그 로그:\n{traceback.format_exc()}")
-                
-        st.markdown("<br>", unsafe_allow_html=True)
-        r_col1, r_col2 = st.columns([1, 2])
-        
-        sim_prob = st.session_state["simulated_prob"]
-        delta = (sim_prob - base_prob) * 100
-        
-        with r_col1:
+                sim_prob = base_prob
+
+            sf = {
+                'Gender': gender, 'Senior Citizen': senior, 'Partner': partner,
+                'Dependents': dep, 'Tenure Months': tenure, 'Phone Service': phone,
+                'Multiple Lines': lines, 'Internet Service': internet,
+                'Online Security': security, 'Online Backup': backup,
+                'Device Protection': dev_prot, 'Tech Support': tech,
+                'Streaming TV': tv, 'Streaming Movies': mov,
+                'Contract': contract, 'Paperless Billing': paperless,
+                'Payment Method': payment, 'Monthly Charges': monthly, 'Total Charges': total
+            }
+
+            delta = (sim_prob - base_prob) * 100
+
             st.markdown("### 📊 기대 분석 지표")
-            st.metric(label="현재 고객 이탈 확률 (Base)", value=f"{base_prob * 100:.2f}%")
-            
-            delta_color = "normal" if delta != 0 else "off"
-            if delta < 0:
-                delta_color = "inverse" # 감소 시 초록색 표시 유리
-            elif delta > 0:
-                delta_color = "inverse"
-                
-            st.metric(label="시뮬레이션 반영 후 이탈 확률", 
-                      value=f"{sim_prob * 100:.2f}%", 
-                      delta=f"{delta:.2f}%p 확률 변화", 
-                      delta_color=delta_color)
-                      
-        with r_col2:
-            st.markdown("### 💡 AI 맞춤형 리텐션(유지) 액션 추천")
-            st.markdown("현재 시뮬레이션 설정값을 바탕으로 고객 맞춤형 대응 전략을 즉시 도출합니다.")
-            
-            sf = st.session_state["simulated_features"]
+            m1, m2 = st.columns(2)
+            m1.metric("현재 이탈 확률", f"{base_prob*100:.2f}%")
+            delta_color = "inverse" if delta != 0 else "off"
+            m2.metric("시뮬레이션 후",  f"{sim_prob*100:.2f}%",
+                      delta=f"{delta:.2f}%p", delta_color=delta_color)
+
+            st.markdown("---")
+            st.markdown("### 💡 AI 맞춤형 리텐션 액션 추천")
+
             actions = []
-            
             if sim_prob >= optimal_threshold:
-                st.error("⚠️ 주의: 해당 조건 유지 시 고객은 **이탈 고위험군**에 속하게 됩니다.")
-                
+                st.error("⚠️ 이탈 고위험군")
                 if sf['Contract'] == "Month-to-month":
-                    actions.append("🏷️ **단기 계약 리스크:** 매월 갱신되는 불안정한 Month-to-month 계약 상태입니다. **약정 할인(1년/2년 계약) 프로모션 쿠폰**을 발송하여 락인 효과를 노리세요.")
-                
+                    actions.append("🏷️ **단기 계약:** 약정 할인 프로모션 쿠폰 발송")
                 if sf['Tenure Months'] < 12:
-                    actions.append("🌱 **초기 이탈 리스크:** 가입 1년 미만의 신규/비숙련 고객입니다. 초기 사용경험 저하를 막기 위해 **온보딩 케어 안내 콜(Care Call) 배정 및 웰컴 혜택**을 선제적으로 제공하세요.")
-                    
+                    actions.append("🌱 **신규 고객:** 온보딩 케어 콜 + 웰컴 혜택 제공")
                 if sf['Internet Service'] == "Fiber optic" and sf['Tech Support'] == "No":
-                    actions.append("👨‍💻 **기술 마찰 리스크:** 고품질인 Fiber Optic을 사용하나 '기술 지원(Tech Support)' 부재로 문제 해결에 어려움을 겪어 이탈할 가능성이 높습니다. **기술지원 3개월 무료 체험**을 권유하세요.")
+                    actions.append("👨‍💻 **기술 지원 부재:** 기술지원 3개월 무료 체험 권유")
                 elif sf['Internet Service'] != "No" and sf['Online Security'] == "No":
-                    actions.append("🛡️ **보안 취약 리스크:** 온라인 보안(Online Security) 서비스에 미가입 상태입니다. **네트워크 보안 결합 특가 할인**을 어필하여 당사 서비스 생태계 의존도를 구축하세요.")
-                    
+                    actions.append("🛡️ **보안 미가입:** 네트워크 보안 결합 특가 할인")
                 if sf['Monthly Charges'] > 70.0:
-                    actions.append("💰 **요금 부담 우려:** 최상위 구간에 속하는 높은 월 청구 요금을 내고 있습니다. 가격 저항선 해소를 위해 **데이터 맞춤형 요금제 컨설팅이나 5% 특별 청구 할인**을 제안해 가격 민감도를 낮추세요.")
-                    
+                    actions.append("💰 **고요금:** 맞춤형 요금제 컨설팅 / 5% 할인 제안")
                 if sf['Senior Citizen'] == 1:
-                    actions.append("👴 **시니어 특화 케어 추천:** 고령자 특성을 지닌 고객입니다. 복잡한 ARS 대기줄 대신 **시니어 전용 직통 상담사 연결 프로세스**로 심리적 안정감을 제공하세요.")
+                    actions.append("👴 **고령자:** 시니어 전용 상담사 연결")
             else:
-                st.success("✅ 해당 조건에서(또는 반영 후) 고객은 **이탈 안전군**으로 분류됩니다.")
+                st.success("✅ 이탈 안전군")
                 if delta < -5:
-                    actions.append("🎉 **시뮬레이션 우수!** 이번 피처 조정을 통해 이탈률이 상당 부분 크게 개선되었습니다. 실제 해당 고객에게 시뮬레이션된 혜택/변경을 제안하는 캠페인을 실행하세요.")
-                
+                    actions.append("🎉 이탈률 크게 개선! 시뮬레이션 혜택을 실제 캠페인으로 실행하세요.")
+
             if actions:
                 for action in actions:
                     st.info(action)
             else:
                 if sim_prob >= optimal_threshold:
-                    st.info("🎯 뚜렷한 리스크 변수 지표가 단일화되지 않은 고위험군입니다. 종합적인 **일반 VIP 관리 유지 혜택(포인트 적립 등)**을 통한 록인(Lock-in)을 시도하십시오.")
+                    st.info("🎯 VIP 관리 유지 혜택으로 Lock-in을 시도하세요.")
                 else:
-                    st.info("🎯 뚜렷한 위험 요소가 없습니다. 현재 상태를 유지하며 일반적인 모니터링 체제를 가동하십시오.")
+                    st.info("🎯 뚜렷한 위험 요소 없음. 일반 모니터링 유지")
+
+            st.markdown("---")
+            if st.button("💾 분석 결과 저장", type="primary", use_container_width=True):
+                save_to_db(
+                    customer_id=st.session_state['searched_customer_id'],
+                    churn_prob=sim_prob,
+                    optimal_threshold=optimal_threshold,
+                    sf=sf
+                )
+                st.success("✅ DB에 저장되었습니다.")
