@@ -188,7 +188,7 @@ def render():
             with col1:
                 st.markdown("##### 👤 기본 인적 사항")
                 gender   = st.selectbox("성별", g_opts, index=safe_index(g_opts, get_val("Gender", "Female")))
-                senior   = st.selectbox("고령자 여부 (Senior)", [0, 1], index=init_senior)
+                senior   = st.selectbox("고령자 여부 (Senior)", [0, 1], index=init_senior, format_func=lambda x: "Yes" if x == 1 else "No")
                 partner  = st.selectbox("배우자 유무 (Partner)", p_opts, index=safe_index(p_opts, get_val("Partner", "No")))
                 dep      = st.selectbox("부양가족 유무 (Dependents)", d_opts, index=safe_index(d_opts, get_val("Dependents", "No")))
                 
@@ -324,3 +324,61 @@ def render():
                     st.info("🎯 뚜렷한 리스크 변수 지표가 단일화되지 않은 고위험군입니다. 종합적인 **일반 VIP 관리 유지 혜택(포인트 적립 등)**을 통한 록인(Lock-in)을 시도하십시오.")
                 else:
                     st.info("🎯 뚜렷한 위험 요소가 없습니다. 현재 상태를 유지하며 일반적인 모니터링 체제를 가동하십시오.")
+                    
+    # =========================================================
+    # 앱 하단: 전체 고객 지리적 분포 및 이탈 리스크 지도 시각화
+    # =========================================================
+    st.markdown("<hr style='margin: 60px 0 30px 0; border-color: var(--border-base);'>", unsafe_allow_html=True)
+    st.subheader("🗺️ 전체 고객 지리적 분포 및 리스크 통계")
+    st.markdown("데이터베이스에 존재하는 위도(Latitude)와 경도(Longitude) 정보를 바탕으로 고객들의 위치 분포와 이탈 확률을 시각화합니다. (빨강: 고위험, 노랑: 경고, 초록: 안전군)")
+
+    target_tbl = db_tables[0] if db_tables else None
+    if target_tbl:
+        with st.spinner("지도 데이터를 분석 중입니다..."):
+            try:
+                import page_manage
+                # 이미 page_manage에 만들어진 일괄 분석 함수(캐싱됨) 재사용
+                map_df = load_data_from_db(target_tbl)
+                risk_df = page_manage.get_batch_predictions(target_tbl)
+                
+                if not map_df.empty and risk_df is not None:
+                    # 위/경도 컬럼 탐색 (포괄적인 이름 패턴 매칭)
+                    lat_col = next((c for c in map_df.columns if c.lower() in ['lat', 'latitude', '위도', 'y']), None)
+                    lon_col = next((c for c in map_df.columns if c.lower() in ['lon', 'longitude', 'lng', '경도', 'x']), None)
+                    
+                    if lat_col and lon_col:
+                        map_df['lat'] = pd.to_numeric(map_df[lat_col], errors='coerce')
+                        map_df['lon'] = pd.to_numeric(map_df[lon_col], errors='coerce')
+                        
+                        id_col = next((c for c in map_df.columns if c.lower() == 'customerid'), None)
+                        if id_col and 'Customer ID' in risk_df.columns:
+                            merged_df = map_df.merge(risk_df, left_on=id_col, right_on='Customer ID', how='inner')
+                        else:
+                            merged_df = map_df
+                            
+                        # 위경도가 없는(NaN) 데이터 드랍
+                        merged_df = merged_df.dropna(subset=['lat', 'lon'])
+                        
+                        if not merged_df.empty:
+                            # Risk Status 기반 색상 지정 (High Risk: Red, Warning: Orange, Safe: Green)
+                            def get_color(status):
+                                if status == 'High Risk': return '#ef4444' # Red
+                                elif status == 'Warning': return '#f59e0b' # Amber/Orange
+                                elif status == 'Safe': return '#10b981' # Emerald/Green
+                                return '#3b82f6' # Blue Default
+                                
+                            if 'Risk Status' in merged_df.columns:
+                                merged_df['color'] = merged_df['Risk Status'].apply(get_color)
+                            else:
+                                merged_df['color'] = '#3b82f6'
+                                
+                            # Streamlit 네이티브 map. 하이엔드 어두운 테마와 찰떡으로 렌더링됨
+                            st.map(merged_df, latitude='lat', longitude='lon', color='color', use_container_width=True)
+                        else:
+                            st.info("지도에 표시할 수 있는 유효한 위경도 좌표 데이터가 없습니다.")
+                    else:
+                        st.info(f"현재 연결된 데이터셋(`{target_tbl}`) 내부에 지역 좌표(위도, 경도) 컬럼이 존재하지 않아 지도를 생성할 수 없습니다.")
+            except Exception as e:
+                import traceback
+                st.error(f"지도 렌더링 중 오류가 발생했습니다: {e}")
+                st.info(f"디버그 로그:\n{traceback.format_exc()}")
