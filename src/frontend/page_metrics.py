@@ -1,8 +1,12 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import platform
+import os
+from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix
+from ml_utils import load_ml_objects, create_engineered_features, DATA_DIR, SAVE_DIR
 
 # 한글 폰트 설정 (운영체제별)
 if platform.system() == 'Windows':
@@ -13,14 +17,57 @@ else:
     plt.rc('font', family='NanumGothic')
 plt.rcParams['axes.unicode_minus'] = False
 
+@st.cache_data
+def get_dynamic_metrics():
+    model, encoder, scaler, columns, threshold = load_ml_objects()
+    if model is None:
+        return 0.8556, 0.7750, 0.5551, None
+        
+    file_path = os.path.join(DATA_DIR, "Telco_customer_churn - Telco_Churn.csv")
+    if not os.path.exists(file_path):
+        return 0.8556, 0.7750, threshold, None
+        
+    df = pd.read_csv(file_path)
+    if 'Total Charges' in df.columns:
+        df['Total Charges'] = pd.to_numeric(df['Total Charges'].replace(' ', np.nan))
+        df.dropna(subset=['Total Charges'], inplace=True)
+    
+    target_col = 'Churn Label' if 'Churn Label' in df.columns else 'Churn'
+    if target_col not in df.columns:
+        return 0.8556, 0.7750, threshold, None
+        
+    y_true = df[target_col].map({'Yes': 1, 'No': 0}).fillna(0).astype(int)
+    
+    # Feature Engineering
+    processed_df = create_engineered_features(df, model_columns=columns)
+    processed_df = processed_df[columns]
+    
+    # Transform
+    encoded_data = encoder.transform(processed_df).astype('float64')
+    scaled_input = scaler.transform(encoded_data)
+    
+    # Predict
+    y_pred_prob = model.predict_proba(scaled_input)[:, 1]
+    y_pred = (y_pred_prob >= threshold).astype(int)
+    
+    # Metrics
+    auc = roc_auc_score(y_true, y_pred_prob)
+    acc = accuracy_score(y_true, y_pred)
+    cm = confusion_matrix(y_true, y_pred)
+    
+    return auc, acc, threshold, cm
+
 def render():
     st.title("AI 예측 모델 성능 지표 (Model Metrics)")
     st.markdown("현업 부서의 신뢰를 확보하기 위해, 모델의 객관적인 성능을 투명하게 공개합니다.")
     
+    with st.spinner("최신 모델 지표를 동적으로 측정 중입니다..."):
+        auc, acc, threshold, cm = get_dynamic_metrics()
+    
     metric_col1, metric_col2, metric_col3 = st.columns(3)
-    metric_col1.metric("AUC Score (예측 정확도)", "0.8556", "성능 검증 완료")
-    metric_col2.metric("Accuracy (전체 정확도)", "0.7750", "최적 임계값 적용 기준")
-    metric_col3.metric("Optimal Threshold", "0.5551", "F1-Score 극대화 지점")
+    metric_col1.metric("AUC Score (예측 정확도)", f"{auc:.4f}", "전체 데이터 예측 결과")
+    metric_col2.metric("Accuracy (전체 정확도)", f"{acc:.4f}", f"임계값 {threshold:.4f} 적용")
+    metric_col3.metric("Optimal Threshold", f"{threshold:.4f}", "F1-Score 극대화 지점")
     
     st.markdown("---")
     col_cm, col_fi = st.columns(2)
@@ -28,13 +75,20 @@ def render():
     with col_cm:
         st.subheader("혼동 행렬 (Confusion Matrix)")
         
-        # Seaborn Heatmap 적용 (Normalized)
-        cm_counts = [[796, 239], [82, 292]]
-        cm_norm = [
-            [796 / (796 + 239), 239 / (796 + 239)],
-            [82 / (82 + 292), 292 / (82 + 292)]
-        ]
-        
+        # 동적 혼동 행렬 적용
+        if cm is not None:
+            cm_counts = cm.tolist()
+            cm_norm = [
+                [cm[0][0] / max(sum(cm[0]), 1), cm[0][1] / max(sum(cm[0]), 1)],
+                [cm[1][0] / max(sum(cm[1]), 1), cm[1][1] / max(sum(cm[1]), 1)]
+            ]
+        else:
+            cm_counts = [[796, 239], [82, 292]]
+            cm_norm = [
+                [796 / (796 + 239), 239 / (796 + 239)],
+                [82 / (82 + 292), 292 / (82 + 292)]
+            ]
+            
         fig_cm, ax_cm = plt.subplots(figsize=(5, 4))
         sns.heatmap(
             cm_norm, 
@@ -57,18 +111,8 @@ def render():
     with col_fi:
         st.subheader("변수 중요도 (Feature Importance)")
         
-        # Seaborn Barplot 적용
-        labels = ['계약 형태', '가입 기간', '단기+고가', '인터넷 종류', '요금 비율']
-        values = [0.85, 0.72, 0.65, 0.58, 0.45]
-        
-        fig_fi, ax_fi = plt.subplots(figsize=(5, 4))
-        sns.barplot(
-            x=values, 
-            y=labels, 
-            hue=labels, 
-            legend=False,
-            palette='viridis', 
-            ax=ax_fi
-        )
-        ax_fi.set_xlabel("중요도 가중치")
-        st.pyplot(fig_fi)
+        fi_path = os.path.join(SAVE_DIR, "feature_importance.png")
+        if os.path.exists(fi_path):
+            st.image(fi_path, use_container_width=True)
+        else:
+            st.info("💡 변수 중요도 시각화 이미지가 없습니다.")
