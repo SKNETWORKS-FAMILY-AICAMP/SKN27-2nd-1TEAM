@@ -154,6 +154,8 @@ def render():
             col_s, col_f = st.columns(2)
             with col_s:
                 search_id = st.text_input("🔍 Customer ID 검색", placeholder="예: 3668-QPYBK", key="real_search")
+                if search_id and not re.match(r'^[A-Za-z0-9-]+$', search_id):
+                    st.warning("⚠️ 영문, 숫자, 하이픈(-)만 입력 가능합니다.")
             with col_f:
                 status_filter = st.multiselect("📊 위험 여부(Risk Status)", ["High Risk", "Warning", "Safe"], default=["High Risk", "Warning", "Safe"], key="real_filter")
                 

@@ -56,6 +56,8 @@ def render():
             selected_file = st.selectbox("데이터셋(DB 테이블)", db_tables)
         with col_id:
             customer_id = st.text_input("Customer ID 검색", placeholder="일부만 입력해도 됩니다 (예: 3668)")
+            if customer_id and not re.match(r'^[A-Za-z0-9-]+$', customer_id):
+                st.warning("⚠️ 영문, 숫자, 하이픈(-)만 입력 가능합니다.")
         with col_btn:
             st.write("")
             st.write("")

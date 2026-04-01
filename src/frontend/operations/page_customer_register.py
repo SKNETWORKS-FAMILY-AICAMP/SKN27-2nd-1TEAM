@@ -26,6 +26,8 @@ def render():
             with col1:
                 st.markdown("**기본 정보**")
                 cust_id   = st.text_input("Customer ID *", placeholder="0000-XXXXX")
+                if cust_id and not re.match(r'^[A-Za-z0-9-]+$', cust_id):
+                    st.warning("⚠️ 영문, 숫자, 하이픈(-)만 사용할 수 있습니다. (한글 입력 불가)")
                 gender    = st.selectbox("성별", ["Male", "Female"])
                 senior    = st.selectbox("고령자 여부", ["No", "Yes"])
                 partner   = st.selectbox("배우자 유무", ["No", "Yes"])
@@ -80,7 +82,10 @@ def render():
 
         col1, col2, col3 = st.columns([2, 2, 1])
         with col1: sel_table  = st.selectbox("테이블 선택", c_tables, key='edit_table')
-        with col2: search_id  = st.text_input("Customer ID 검색", placeholder="3668-QPYBK")
+        with col2: 
+            search_id  = st.text_input("Customer ID 검색", placeholder="3668-QPYBK")
+            if search_id and not re.match(r'^[A-Za-z0-9-]+$', search_id):
+                st.warning("⚠️ 영문, 숫자, 하이픈(-)만 입력 가능합니다.")
         with col3:
             st.write("")
             st.write("")
