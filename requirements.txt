@@ -17,4 +17,9 @@ jupyter==1.1.1
 shap==0.46.0
 optuna==4.8.0
 wordcloud==1.9.6
+<<<<<<< HEAD
 pymysql==1.1.2
+=======
+pymysql
+hydralit_components
+>>>>>>> b2494bf5580f5d8cdc87c861fb185de08065f56a

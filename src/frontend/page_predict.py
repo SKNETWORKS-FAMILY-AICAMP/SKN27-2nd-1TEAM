@@ -52,16 +52,25 @@ def render():
 
     # ── 1. 고객 검색 ──────────────────────────────────
     with st.container():
-        st.subheader("1. 시뮬레이션 대상 고객 선택")
-        col_file, col_id, col_btn = st.columns([2, 2, 1])
-        with col_file:
-            selected_file = st.selectbox("데이터셋(DB 테이블)", db_tables)
+        st.markdown("### 🔍 1. 시뮬레이션 대상 고객 검색")
+    
+        
+        # 세련된 검색바 배치를 위해 컨테이너 내부 폼 정렬
+        col_id, col_btn = st.columns([5, 1])
         with col_id:
+<<<<<<< HEAD
             customer_id = st.text_input("Customer ID 검색", placeholder="일부만 입력해도 됩니다 (예: 3668)")
+=======
+            customer_id = st.text_input(
+                "Customer ID 검색", 
+                placeholder="🔎 검색할 고객 ID를 입력하세요. (예: 3668-QPYBK)", 
+                label_visibility="collapsed"
+            )
+>>>>>>> b2494bf5580f5d8cdc87c861fb185de08065f56a
         with col_btn:
-            st.write("")
-            st.write("")
-            search_clicked = st.button("고객 조회", use_container_width=True)
+            search_clicked = st.button("데이터 조회", type="primary", use_container_width=True)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
 
     # 세션 초기화
     if "current_customer_df" not in st.session_state:
@@ -86,6 +95,7 @@ def render():
             st.error("Customer ID를 입력해 주세요.")
             st.session_state["search_results"] = None
         else:
+<<<<<<< HEAD
             try:
                 df = load_data_from_db(selected_file)
                 id_col = None
@@ -119,6 +129,42 @@ def render():
             except Exception as e:
                 st.error(f"검색 중 오류: {e}")
                 st.session_state["search_results"] = None
+=======
+            found_cust_df = None
+            found_table = None
+            
+            with st.spinner("DB 내부의 전체 고객 데이터를 검색 중입니다..."):
+                for table in db_tables:
+                    try:
+                        df = load_data_from_db(table)
+                        id_col = None
+                        for c in df.columns:
+                            if c.lower() == 'customerid':
+                                id_col = c
+                                break
+                                
+                        if id_col is not None:
+                            matches = df[df[id_col] == customer_id.strip()]
+                            if not matches.empty:
+                                found_cust_df = matches.copy()
+                                found_table = table
+                                break # 찾았으면 즉시 중단
+                    except Exception:
+                        pass # 오류 발생 테이블은 무시하고 다음 탐색
+
+            if found_cust_df is None:
+                st.error(f"DB 내 전체 테이블을 검색했으나 Customer ID '{customer_id}'를 찾을 수 없습니다.")
+                st.session_state["current_customer_df"] = None
+            else:
+                st.session_state["current_customer_df"] = found_cust_df.iloc[[0]].copy()
+                st.session_state["searched_customer_id"] = customer_id.strip()
+                prob = get_prob(st.session_state["current_customer_df"])
+                st.session_state["base_prob"] = prob
+                st.session_state["simulated_prob"] = prob
+                if "simulated_features" in st.session_state:
+                    del st.session_state["simulated_features"]
+                st.success(f"고객 정보를 성공적으로 불러왔습니다. (데이터 출처: `{found_table}` 테이블)")
+>>>>>>> b2494bf5580f5d8cdc87c861fb185de08065f56a
 
     # ── 3. 검색 결과 목록 표시 + 선택 ────────────────
     results = st.session_state.get("search_results")
@@ -202,6 +248,7 @@ def render():
         raw_monthly  = get_val("Monthly Charges", 70.0)
         init_monthly = float(raw_monthly) if pd.notna(raw_monthly) else 70.0
 
+<<<<<<< HEAD
         # ── 고객 기본 정보 (읽기 전용) ────────────────
         st.markdown("**📋 고객 기본 정보 (변경 불가)**")
         gender  = str(get_val("Gender",     "Female"))
@@ -243,6 +290,62 @@ def render():
 
         with right_col:
             # 실시간 확률 계산
+=======
+        with st.form("what_if_simulator"):
+            st.markdown("#### ⚙️ 시뮬레이션 변수 세부 조정")
+            st.caption("고객의 서비스 가입 세부 상태 및 약정 조건을 자유롭게 변경하여 이탈 방지 전략을 탐색하세요.")
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown("##### 👤 기본 인적 사항")
+                gender   = st.selectbox("성별", g_opts, index=safe_index(g_opts, get_val("Gender", "Female")))
+                senior   = st.selectbox("고령자 여부 (Senior)", [0, 1], index=init_senior, format_func=lambda x: "Yes" if x == 1 else "No")
+                partner  = st.selectbox("배우자 유무 (Partner)", p_opts, index=safe_index(p_opts, get_val("Partner", "No")))
+                dep      = st.selectbox("부양가족 유무 (Dependents)", d_opts, index=safe_index(d_opts, get_val("Dependents", "No")))
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("##### 📞 주요 통신 라인")
+                phone     = st.selectbox("전화 서비스", ph_opts, index=safe_index(ph_opts, get_val("Phone Service", "Yes")))
+                lines     = st.selectbox("다중 회선 (Multiple Lines)", l_opts, index=safe_index(l_opts, get_val("Multiple Lines", "No")))
+                
+            with col2:
+                st.markdown("##### 🌐 인터넷 및 부가서비스")
+                internet  = st.selectbox("인터넷 서비스 타입", i_opts, index=safe_index(i_opts, get_val("Internet Service", "Fiber optic")))
+                security  = st.selectbox("🛡️ 온라인 보안", s_opts, index=safe_index(s_opts, get_val("Online Security", "No")))
+                backup    = st.selectbox("💾 온라인 백업", s_opts, index=safe_index(s_opts, get_val("Online Backup", "No")))
+                dev_prot  = st.selectbox("📱 기기 보호 플랜", s_opts, index=safe_index(s_opts, get_val("Device Protection", "No")))
+                tech      = st.selectbox("👨‍💻 프리미엄 기술 지원", s_opts, index=safe_index(s_opts, get_val("Tech Support", "No")))
+                tv        = st.selectbox("📺 스트리밍 TV", s_opts, index=safe_index(s_opts, get_val("Streaming TV", "No")))
+                mov       = st.selectbox("🎬 스트리밍 영화", s_opts, index=safe_index(s_opts, get_val("Streaming Movies", "No")))
+                
+            with col3:
+                st.markdown("##### 📄 계약 및 결제 정보")
+                contract  = st.selectbox("계약 형태 (Contract)", c_opts, index=safe_index(c_opts, get_val("Contract", "Month-to-month")))
+                tenure    = st.number_input("가입 기간(월 기준)", 1, 100, init_tenure, help="고객이 서비스에 가입한 전체 개월 수입니다.")
+                paperless = st.selectbox("모바일/전자청구서", pl_opts, index=safe_index(pl_opts, get_val("Paperless Billing", "Yes")))
+                payment   = st.selectbox("결제/납부 방식", pm_opts, index=safe_index(pm_opts, get_val("Payment Method", "Electronic check")))
+                monthly   = st.number_input("월 청구 요금($)", 0.0, 200.0, init_monthly, help="현재 매월 청구되는 예상 서비스 이용 요금입니다.")
+                total     = st.number_input("누적 총 요금($)", 0.0, 10000.0, init_total)
+
+            st.markdown("<hr style='margin: 15px 0 25px 0;'>", unsafe_allow_html=True)
+            submitted = st.form_submit_button("🚀 적용 및 시뮬레이션 결과 확인", type="primary", use_container_width=True)
+
+        if "simulated_features" not in st.session_state:
+            st.session_state["simulated_prob"] = base_prob
+            st.session_state["simulated_features"] = {
+                'Gender': get_val('Gender', 'Female'), 'Senior Citizen': init_senior, 'Partner': get_val('Partner', 'No'),
+                'Dependents': get_val('Dependents', 'No'), 'Tenure Months': init_tenure, 'Phone Service': get_val('Phone Service', 'Yes'),
+                'Multiple Lines': get_val('Multiple Lines', 'No'), 'Internet Service': get_val('Internet Service', 'Fiber optic'),
+                'Online Security': get_val('Online Security', 'No'), 'Online Backup': get_val('Online Backup', 'No'),
+                'Device Protection': get_val('Device Protection', 'No'), 'Tech Support': get_val('Tech Support', 'No'),
+                'Streaming TV': get_val('Streaming TV', 'No'), 'Streaming Movies': get_val('Streaming Movies', 'No'),
+                'Contract': get_val('Contract', 'Month-to-month'), 'Paperless Billing': get_val('Paperless Billing', 'Yes'),
+                'Payment Method': get_val('Payment Method', 'Electronic check'), 'Monthly Charges': init_monthly, 'Total Charges': init_total
+            }
+
+        if submitted:
+>>>>>>> b2494bf5580f5d8cdc87c861fb185de08065f56a
             sim_input = pd.DataFrame([{
                 'Gender': gender, 'Senior Citizen': senior, 'Partner': partner,
                 'Dependents': dep, 'Tenure Months': tenure, 'Phone Service': phone,
@@ -310,6 +413,7 @@ def render():
                 if sim_prob >= optimal_threshold:
                     st.info("🎯 VIP 관리 유지 혜택으로 Lock-in을 시도하세요.")
                 else:
+<<<<<<< HEAD
                     st.info("🎯 뚜렷한 위험 요소 없음. 일반 모니터링 유지")
 
             st.markdown("---")
@@ -321,3 +425,64 @@ def render():
                     sf=sf
                 )
                 st.success("✅ DB에 저장되었습니다.")
+=======
+                    st.info("🎯 뚜렷한 위험 요소가 없습니다. 현재 상태를 유지하며 일반적인 모니터링 체제를 가동하십시오.")
+                    
+    # =========================================================
+    # 앱 하단: 전체 고객 지리적 분포 및 이탈 리스크 지도 시각화
+    # =========================================================
+    st.markdown("<hr style='margin: 60px 0 30px 0; border-color: var(--border-base);'>", unsafe_allow_html=True)
+    st.subheader("🗺️ 전체 고객 지리적 분포 및 리스크 통계")
+    st.markdown("데이터베이스에 존재하는 위도(Latitude)와 경도(Longitude) 정보를 바탕으로 고객들의 위치 분포와 이탈 확률을 시각화합니다. (빨강: 고위험, 노랑: 경고, 초록: 안전군)")
+
+    target_tbl = db_tables[0] if db_tables else None
+    if target_tbl:
+        with st.spinner("지도 데이터를 분석 중입니다..."):
+            try:
+                import page_manage
+                # 이미 page_manage에 만들어진 일괄 분석 함수(캐싱됨) 재사용
+                map_df = load_data_from_db(target_tbl)
+                risk_df = page_manage.get_batch_predictions(target_tbl)
+                
+                if not map_df.empty and risk_df is not None:
+                    # 위/경도 컬럼 탐색 (포괄적인 이름 패턴 매칭)
+                    lat_col = next((c for c in map_df.columns if c.lower() in ['lat', 'latitude', '위도', 'y']), None)
+                    lon_col = next((c for c in map_df.columns if c.lower() in ['lon', 'longitude', 'lng', '경도', 'x']), None)
+                    
+                    if lat_col and lon_col:
+                        map_df['lat'] = pd.to_numeric(map_df[lat_col], errors='coerce')
+                        map_df['lon'] = pd.to_numeric(map_df[lon_col], errors='coerce')
+                        
+                        id_col = next((c for c in map_df.columns if c.lower() == 'customerid'), None)
+                        if id_col and 'Customer ID' in risk_df.columns:
+                            merged_df = map_df.merge(risk_df, left_on=id_col, right_on='Customer ID', how='inner')
+                        else:
+                            merged_df = map_df
+                            
+                        # 위경도가 없는(NaN) 데이터 드랍
+                        merged_df = merged_df.dropna(subset=['lat', 'lon'])
+                        
+                        if not merged_df.empty:
+                            # Risk Status 기반 색상 지정 (High Risk: Red, Warning: Orange, Safe: Green)
+                            def get_color(status):
+                                if status == 'High Risk': return '#ef4444' # Red
+                                elif status == 'Warning': return '#f59e0b' # Amber/Orange
+                                elif status == 'Safe': return '#10b981' # Emerald/Green
+                                return '#3b82f6' # Blue Default
+                                
+                            if 'Risk Status' in merged_df.columns:
+                                merged_df['color'] = merged_df['Risk Status'].apply(get_color)
+                            else:
+                                merged_df['color'] = '#3b82f6'
+                                
+                            # Streamlit 네이티브 map. 하이엔드 어두운 테마와 찰떡으로 렌더링됨
+                            st.map(merged_df, latitude='lat', longitude='lon', color='color', use_container_width=True)
+                        else:
+                            st.info("지도에 표시할 수 있는 유효한 위경도 좌표 데이터가 없습니다.")
+                    else:
+                        st.info(f"현재 연결된 데이터셋(`{target_tbl}`) 내부에 지역 좌표(위도, 경도) 컬럼이 존재하지 않아 지도를 생성할 수 없습니다.")
+            except Exception as e:
+                import traceback
+                st.error(f"지도 렌더링 중 오류가 발생했습니다: {e}")
+                st.info(f"디버그 로그:\n{traceback.format_exc()}")
+>>>>>>> b2494bf5580f5d8cdc87c861fb185de08065f56a
