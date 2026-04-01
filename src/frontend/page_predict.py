@@ -52,16 +52,17 @@ def render():
 
     # ── 1. 고객 검색 ──────────────────────────────────
     with st.container():
-        st.subheader("1. 시뮬레이션 대상 고객 선택")
-        col_file, col_id, col_btn = st.columns([2, 2, 1])
-        with col_file:
-            selected_file = st.selectbox("데이터셋(DB 테이블)", db_tables)
+        st.markdown("### 🔍 1. 시뮬레이션 대상 고객 검색")
+    
+        
+        # 세련된 검색바 배치를 위해 컨테이너 내부 폼 정렬
+        col_id, col_btn = st.columns([5, 1])
         with col_id:
             customer_id = st.text_input("Customer ID 검색", placeholder="일부만 입력해도 됩니다 (예: 3668)")
         with col_btn:
-            st.write("")
-            st.write("")
-            search_clicked = st.button("고객 조회", use_container_width=True)
+            search_clicked = st.button("데이터 조회", type="primary", use_container_width=True)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
 
     # 세션 초기화
     if "current_customer_df" not in st.session_state:

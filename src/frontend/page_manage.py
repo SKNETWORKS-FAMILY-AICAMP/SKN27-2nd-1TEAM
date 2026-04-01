@@ -166,10 +166,10 @@ def render():
         with c1:
             fig, ax = plt.subplots(figsize=(4, 4))
             ax.pie(risk_counts.values, labels=risk_counts.index, autopct='%1.1f%%', 
-                   colors=colors, startangle=90, pctdistance=0.75, textprops={'fontsize': 10, 'weight': 'bold'},
-                   wedgeprops={'edgecolor': 'white', 'linewidth': 1.5})
+                   colors=colors, startangle=90, pctdistance=0.75, textprops={'fontsize': 10, 'weight': 'bold', 'color': '#f8fafc'},
+                   wedgeprops={'edgecolor': '#0f172a', 'linewidth': 1.5})
             
-            centre_circle = plt.Circle((0,0), 0.55, fc='white')
+            centre_circle = plt.Circle((0,0), 0.55, fc='#0f172a')
             fig.gca().add_artist(centre_circle)
             ax.axis('equal')
             fig.patch.set_alpha(0.0) 
@@ -210,11 +210,11 @@ def render():
             
         def color_risk_status(val):
             if val == "High Risk":
-                return 'background-color: rgba(255, 75, 75, 0.2); color: #8B0000; font-weight: bold;'
+                return 'background-color: rgba(255, 75, 75, 0.2); color: #ff9999; font-weight: bold;'
             elif val == "Warning":
-                return 'background-color: rgba(255, 204, 0, 0.2); color: #8B6508; font-weight: bold;'
+                return 'background-color: rgba(255, 204, 0, 0.2); color: #ffe680; font-weight: bold;'
             elif val == "Safe":
-                return 'background-color: rgba(46, 204, 113, 0.2); color: #006400; font-weight: bold;'
+                return 'background-color: rgba(46, 204, 113, 0.2); color: #85e085; font-weight: bold;'
             return ''
             
         styled_mock = filtered_mock.style.map(color_risk_status, subset=['Risk Status']) if hasattr(filtered_mock.style, 'map') else filtered_mock.style.applymap(color_risk_status, subset=['Risk Status'])
@@ -246,11 +246,11 @@ def render():
             
             def color_risk_status(val):
                 if val == "High Risk":
-                    return 'background-color: rgba(255, 75, 75, 0.2); color: #8B0000; font-weight: bold;'
+                    return 'background-color: rgba(255, 75, 75, 0.2); color: #ff9999; font-weight: bold;'
                 elif val == "Warning":
-                    return 'background-color: rgba(255, 204, 0, 0.2); color: #8B6508; font-weight: bold;'
+                    return 'background-color: rgba(255, 204, 0, 0.2); color: #ffe680; font-weight: bold;'
                 elif val == "Safe":
-                    return 'background-color: rgba(46, 204, 113, 0.2); color: #006400; font-weight: bold;'
+                    return 'background-color: rgba(46, 204, 113, 0.2); color: #85e085; font-weight: bold;'
                 return ''
                 
             styled_disp = disp_df.style.map(color_risk_status, subset=['Risk Status']) if hasattr(disp_df.style, 'map') else disp_df.style.applymap(color_risk_status, subset=['Risk Status'])
