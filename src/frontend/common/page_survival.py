@@ -43,8 +43,8 @@ def kaplan_meier(df, group_col=None, group_val=None):
     return pd.DataFrame(survival)
 
 def render():
-    st.title("📈 생존 분석")
-    st.caption("Kaplan-Meier 생존 분석으로 고객 이탈 패턴을 분석합니다.")
+    st.title("📈 고객 유지율 분석")
+    st.caption("가입 후 시간이 지남에 따라 고객이 얼마나 남아있는지 분석합니다. 이탈 위험이 가장 높은 시점(골든타임)을 파악해 리텐션 전략을 수립합니다.")
 
     try:
         df = load_raw()
@@ -56,8 +56,8 @@ def render():
 
     # ── TAB 1: 전체 생존 곡선 ─────────────────────
     with tab1:
-        st.subheader("전체 고객 생존 곡선")
-        st.caption("가입 기간에 따른 고객 잔존율을 보여줍니다.")
+        st.subheader("전체 고객 유지율 곡선")
+        st.caption("X축은 가입 개월 수, Y축은 그 시점까지 이탈하지 않고 남아있는 고객 비율입니다. 곡선이 급격히 떨어지는 구간이 이탈 위험이 높은 시기입니다.")
 
         k1, k2, k3 = st.columns(3)
         k1.metric("전체 고객",    f"{len(df):,}명")
@@ -77,9 +77,9 @@ def render():
         fig.add_vline(x=12, line_dash='dash', line_color='#FF9800',
                       annotation_text='12개월')
         fig.update_layout(
-            title='전체 고객 Kaplan-Meier 생존 곡선',
+            title='전체 고객 유지율 곡선 (가입 월 → 잔존 비율)',
             xaxis_title='이용 기간 (월)',
-            yaxis_title='생존율 (잔존 확률)',
+            yaxis_title='유지율 (이탈 없이 남아있는 비율)',
             yaxis=dict(tickformat='.0%', range=[0,1]),
             height=400
         )
@@ -94,7 +94,7 @@ def render():
 
     # ── TAB 2: 그룹별 비교 ────────────────────────
     with tab2:
-        st.subheader("그룹별 생존 곡선 비교")
+        st.subheader("그룹별 고객 유지율 비교")
 
         group_col = st.selectbox("비교 기준", [
             "Contract", "Internet Service", "Payment Method",
@@ -119,7 +119,7 @@ def render():
         fig.update_layout(
             title=f'{group_col}별 생존 곡선 비교',
             xaxis_title='이용 기간 (월)',
-            yaxis_title='생존율',
+            yaxis_title='유지율',
             yaxis=dict(tickformat='.0%', range=[0,1]),
             height=450, legend_title=group_col
         )

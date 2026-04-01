@@ -25,13 +25,14 @@ def load_raw():
 
 def render():
     st.title("📣 캠페인 관리")
-    st.caption("이탈 방어 캠페인을 생성하고 대상 고객을 관리합니다.")
+    st.caption("EDA에서 발견한 이탈 패턴을 바탕으로 캠페인을 만들고 진행 상황을 관리합니다. 캠페인 생성 → 현황 관리 → A/B 테스트 순으로 활용하세요.")
 
     tab1, tab2, tab3 = st.tabs(["➕ 캠페인 생성", "📋 캠페인 현황", "📊 A/B 테스트 비교"])
 
     # ── TAB 1: 캠페인 생성 ────────────────────────
     with tab1:
         st.subheader("새 캠페인 만들기")
+        st.caption("캠페인 유형을 선택하면 해당 조건에 맞는 타겟 고객 수와 예상 ROI가 자동으로 계산됩니다. 이름과 비용을 입력하고 생성하면 DB에 저장됩니다.")
 
         try:
             df = load_raw()
@@ -80,6 +81,7 @@ def render():
         # ROI 미리보기
         st.markdown("---")
         st.markdown("**📊 ROI 미리보기**")
+        st.caption("방어율 30% 기준으로 계산한 예상 수익입니다. 절약 수익 = 방어 인원 × 평균 CLTV $4,149 / ROI = 순이익 ÷ 총 비용 × 100%")
         avg_cltv = 4149
         defended = int(target_n * 0.3)
         saved    = defended * avg_cltv
@@ -108,6 +110,7 @@ def render():
     # ── TAB 2: 캠페인 현황 ────────────────────────
     with tab2:
         st.subheader("진행 중인 캠페인")
+        st.caption("생성된 캠페인 목록입니다. 각 캠페인을 클릭하면 상세 정보를 확인하고 진행중/완료/중단으로 상태를 변경할 수 있습니다.")
         df_c = get_campaigns()
 
         if df_c.empty:
@@ -152,7 +155,7 @@ def render():
     # ── TAB 3: A/B 테스트 비교 ────────────────────
     with tab3:
         st.subheader("캠페인 A/B 테스트 비교")
-        st.caption("두 캠페인의 예상 효과를 비교합니다.")
+        st.caption("두 캠페인의 조건(대상 고객 수, 방어율, 비용)을 각각 입력하면 절약 수익·총 비용·순이익·ROI를 나란히 비교합니다. 어떤 캠페인이 더 효율적인지 확인하세요.")
 
         try:
             df = load_raw()

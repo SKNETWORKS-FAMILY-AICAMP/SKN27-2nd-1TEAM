@@ -24,6 +24,7 @@ try:
     import page_survival
     # 분석팀
     import page_metrics
+    import page_segment
     # 마케팅팀
     import page_marketing
     import page_campaign
@@ -38,6 +39,7 @@ try:
     import page_manage
     import page_customer_register
     import page_report
+    import page_history
     from db_utils import init_db
     init_db()
     modules_loaded = True
@@ -87,14 +89,12 @@ if not st.session_state["has_loaded"] and modules_loaded and os.path.exists(LOGO
 st.session_state["has_loaded"] = True
 
 # ── 팀별 메뉴 정의 ────────────────────────────────
-# 요청사항 반영:
-# - 대시보드: 공용(맨위) + 운영팀(맨위)
-# - 분석팀: 모델 관련만
-# - 생존분석: 공용으로 이동
-# - 고객 세그먼트: 분석팀에서 삭제
-# - 운영팀 순서: 전체대시보드→배치예측→고객데이터관리→고객등록수정→리포트생성→알림이력삭제
-# - 공용: 이탈사유/상관관계/생존분석
-# - 영업팀: 고객상세프로필 맨위
+# 각 팀은 자기 역할에 맞는 메뉴만 가짐 (중복 없음)
+# 공용: 전체가 알아야 할 인사이트
+# 분석팀: 모델/데이터 분석 전문
+# 마케팅팀: 캠페인/수익 전략
+# 영업팀: 고객 직접 접촉
+# 운영팀: 시스템 전체 관리
 
 TEAM_MENUS = {
     "🌐 공용 인사이트": {
@@ -102,7 +102,7 @@ TEAM_MENUS = {
             "전체 대시보드",
             "이탈 사유 분석",
             "상관관계 분석",
-            "생존 분석",
+            "고객 유지율 분석",
         ],
         "icons": [
             "speedometer2",
@@ -115,17 +115,11 @@ TEAM_MENUS = {
     "📊 분석팀": {
         "menus": [
             "모델 성능 지표",
-            "이탈 사유 분석",
-            "상관관계 분석",
-            "생존 분석",
-            "전체 대시보드",
+            "고객 세그먼트 분석",
         ],
         "icons": [
             "bar-chart-line-fill",
-            "chat-left-text-fill",
-            "link-45deg",
-            "graph-up",
-            "speedometer2",
+            "people-fill",
         ],
         "color": "#2563EB"
     },
@@ -134,15 +128,11 @@ TEAM_MENUS = {
             "마케팅 액션 플랜",
             "캠페인 관리",
             "수익 분석",
-            "이탈 사유 분석",
-            "전체 대시보드",
         ],
         "icons": [
             "megaphone-fill",
             "bullseye",
             "currency-dollar",
-            "chat-left-text-fill",
-            "speedometer2",
         ],
         "color": "#16A34A"
     },
@@ -152,14 +142,12 @@ TEAM_MENUS = {
             "이탈 위험 예측",
             "지역 분석",
             "알림 센터",
-            "전체 대시보드",
         ],
         "icons": [
             "person-badge-fill",
             "lightning-charge-fill",
             "geo-alt-fill",
             "bell-fill",
-            "speedometer2",
         ],
         "color": "#D97706"
     },
@@ -167,14 +155,14 @@ TEAM_MENUS = {
         "menus": [
             "전체 대시보드",
             "배치 예측 실행",
-            "고객 데이터 관리",
+            "예측 이력 조회",
             "고객 등록/수정",
             "리포트 생성",
         ],
         "icons": [
             "speedometer2",
-            "people-fill",
-            "database-fill",
+            "cpu-fill",
+            "clock-history",
             "person-plus-fill",
             "file-earmark-bar-graph-fill",
         ],
@@ -186,8 +174,9 @@ PAGE_ROUTES = {
     "전체 대시보드"     : lambda: page_dashboard.render(),
     "이탈 사유 분석"    : lambda: page_churn_reason.render(),
     "상관관계 분석"     : lambda: page_correlation.render(),
-    "생존 분석"         : lambda: page_survival.render(),
+    "고객 유지율 분석"  : lambda: page_survival.render(),
     "모델 성능 지표"    : lambda: page_metrics.render(),
+    "고객 세그먼트 분석": lambda: page_segment.render(),
     "마케팅 액션 플랜"  : lambda: page_marketing.render(),
     "캠페인 관리"       : lambda: page_campaign.render(),
     "수익 분석"         : lambda: page_revenue.render(),
@@ -196,7 +185,7 @@ PAGE_ROUTES = {
     "지역 분석"         : lambda: page_region.render(),
     "알림 센터"         : lambda: page_alert.render(),
     "배치 예측 실행"    : lambda: page_manage.render(),
-    "고객 데이터 관리"  : lambda: page_manage.render(),
+    "예측 이력 조회"    : lambda: page_history.render(),
     "고객 등록/수정"    : lambda: page_customer_register.render(),
     "리포트 생성"       : lambda: page_report.render(),
 }
