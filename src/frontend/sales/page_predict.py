@@ -42,6 +42,7 @@ def render():
     if conn:
         db_tables = get_tables()
         conn.close()
+        db_tables = [t for t in db_tables if t not in ['predictions','alerts','campaigns','campaign_targets']]
 
     if not db_tables:
         st.warning("데이터베이스(`churn_db`)에 분석 가능한 테이블이 없습니다. 데이터를 먼저 적재하세요.")

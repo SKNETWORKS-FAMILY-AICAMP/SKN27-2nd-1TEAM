@@ -1,6 +1,7 @@
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'utils'))
 
+import re
 import streamlit as st
 import pandas as pd
 from db_utils import get_tables, load_table, insert_customer, update_customer
@@ -55,6 +56,8 @@ def render():
         if submitted:
             if not cust_id.strip():
                 st.error("Customer ID를 입력하세요.")
+            elif not re.match(r'^\d{4}-[A-Za-z]{5}$', cust_id.strip()):
+                st.error("Customer ID 형식이 올바르지 않습니다. (예: 4190-MFLUW)")
             else:
                 data = {
                     'CustomerID': cust_id, 'Gender': gender,
@@ -70,7 +73,6 @@ def render():
                 }
                 if insert_customer(data, selected_table):
                     st.success(f"✅ {cust_id} 고객이 등록되었습니다!")
-                    st.balloons()
 
     # ── TAB 2: 기존 고객 수정 ─────────────────────
     with tab2:
@@ -92,7 +94,6 @@ def render():
                 if not result.empty:
                     st.session_state['edit_customer'] = result.iloc[0].to_dict()
                     st.session_state['edit_id_col']   = id_col
-                    st.session_state['edit_table']    = sel_table
                     st.success(f"✅ {result.iloc[0][id_col]} 고객 정보를 불러왔습니다.")
                 else:
                     st.error("고객을 찾을 수 없습니다.")

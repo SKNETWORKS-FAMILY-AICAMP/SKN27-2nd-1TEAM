@@ -103,7 +103,6 @@ def render():
                 ok = create_campaign(c_name, c_type, target_n, discount, cost_per)
                 if ok:
                     st.success(f"✅ '{c_name}' 캠페인이 생성되었습니다!")
-                    st.balloons()
                 else:
                     st.error("캠페인 생성 실패")
 
