@@ -24,6 +24,7 @@ try:
     import page_survival
     # 분석팀
     import page_metrics
+    import page_segment
     # 마케팅팀
     import page_marketing
     import page_campaign
@@ -38,6 +39,7 @@ try:
     import page_manage
     import page_customer_register
     import page_report
+    import page_history
     from db_utils import init_db
     init_db()
     modules_loaded = True
@@ -101,8 +103,6 @@ TEAM_MENUS = {
         "menus": [
             "전체 대시보드",
             "이탈 사유 분석",
-            "상관관계 분석",
-            "생존 분석",
         ],
         "icons": [
             "speedometer2",
@@ -149,6 +149,7 @@ TEAM_MENUS = {
     "👤 영업팀": {
         "menus": [
             "고객 상세 프로필",
+            "고객 세그먼트 분석",
             "이탈 위험 예측",
             "지역 분석",
             "알림 센터",
@@ -195,8 +196,9 @@ PAGE_ROUTES = {
     "이탈 위험 예측"    : lambda: page_predict.render(),
     "지역 분석"         : lambda: page_region.render(),
     "알림 센터"         : lambda: page_alert.render(),
-    "배치 예측 실행"    : lambda: page_manage.render(),
+    "배치 예측 실행"    : lambda: page_history.render(),
     "고객 데이터 관리"  : lambda: page_manage.render(),
+    "고객 세그먼트 분석": lambda: page_segment.render(),
     "고객 등록/수정"    : lambda: page_customer_register.render(),
     "리포트 생성"       : lambda: page_report.render(),
 }
