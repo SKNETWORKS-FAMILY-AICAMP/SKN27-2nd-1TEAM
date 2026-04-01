@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'utils'))
 
 import streamlit as st
 import pandas as pd
@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
-DATA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
+DATA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data"))
 DATA_PATH = os.path.join(DATA_DIR, "Telco_customer_churn - Telco_Churn.csv")
 
 @st.cache_data
@@ -138,20 +138,21 @@ def render():
             총고객수=('Churn Value','count'),
             이탈수=('Churn Value','sum'),
         ).reset_index()
-        churn_stats['이탈률(%)'] = (churn_stats['이탈수']/churn_stats['총고객수']*100).round(1)
-        churn_stats['CLTV손실'] = churn_stats['이탈수'] * 4149
+        churn_stats['이탈률(%)']  = (churn_stats['이탈수']/churn_stats['총고객수']*100).round(1)
+        churn_stats['CLTV 손실'] = (churn_stats['이탈수'] * 4149).apply(lambda x: f'${x:,.0f}')
 
-        fig = px.bar(churn_stats, x='세그먼트명', y='이탈률(%)',
-                     color='이탈률(%)', color_continuous_scale='Reds',
-                     text='이탈률(%)', title='세그먼트별 이탈률')
-        fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-        fig.update_layout(height=350)
-        st.plotly_chart(fig, use_container_width=True)
+        col_l, col_r = st.columns(2)
+        with col_l:
+            fig = px.bar(churn_stats, x='세그먼트명', y='이탈률(%)',
+                         color='이탈률(%)', color_continuous_scale='Reds',
+                         text='이탈률(%)', title='세그먼트별 이탈률')
+            fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+            fig.update_layout(height=350)
+            st.plotly_chart(fig, use_container_width=True)
 
-        st.markdown("**세그먼트별 비즈니스 임팩트**")
-        churn_stats['CLTV손실'] = churn_stats['CLTV손실'].apply(lambda x: f'${x:,.0f}')
-        st.dataframe(churn_stats, use_container_width=True, hide_index=True)
-
-        high_risk = churn_stats.nlargest(1, '이탈률(%)')
-        st.error(f"⚠️ 가장 위험한 세그먼트: **{high_risk.iloc[0]['세그먼트명']}** "
-                 f"(이탈률 {high_risk.iloc[0]['이탈률(%)']:.1f}%)")
+        with col_r:
+            st.markdown("**세그먼트별 비즈니스 임팩트**")
+            st.dataframe(churn_stats, use_container_width=True, hide_index=True)
+            high_risk = churn_stats.nlargest(1, '이탈률(%)')
+            st.error(f"⚠️ 가장 위험한 세그먼트: **{high_risk.iloc[0]['세그먼트명']}** "
+                     f"(이탈률 {high_risk.iloc[0]['이탈률(%)']:.1f}%)")

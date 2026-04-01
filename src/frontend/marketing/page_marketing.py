@@ -1,12 +1,12 @@
+import sys, os
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import os
 from datetime import datetime
 
-DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "Telco_customer_churn - Telco_Churn.csv"))
+DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "Telco_customer_churn - Telco_Churn.csv"))
 
 @st.cache_data
 def load_raw():

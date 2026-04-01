@@ -1,12 +1,9 @@
+import sys, os
 import streamlit as st
 import pandas as pd
 import numpy as np
 from ml_utils import load_ml_objects, create_engineered_features
 from db_utils import get_conn, get_tables, load_table, save_prediction
-
-
-def load_data_from_db(table_name):
-    return load_table(table_name)
 
 
 def save_to_db(customer_id, churn_prob, optimal_threshold, sf):
@@ -87,7 +84,7 @@ def render():
             st.session_state["search_results"] = None
         else:
             try:
-                df = load_data_from_db(selected_file)
+                df = load_table(selected_file)
                 id_col = None
                 for c in df.columns:
                     if c == "CustomerID" or c.lower() == "customerid":

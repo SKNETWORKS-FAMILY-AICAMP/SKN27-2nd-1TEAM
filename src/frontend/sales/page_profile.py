@@ -1,12 +1,12 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'utils'))
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from db_utils import get_conn, get_tables, load_table
+from db_utils import get_tables, load_table, get_customer_predictions
 
 DATA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
 DATA_PATH = os.path.join(DATA_DIR, "Telco_customer_churn - Telco_Churn.csv")
@@ -19,22 +19,6 @@ def load_raw():
     ).fillna(0)
     return df
 
-def get_customer_predictions(customer_id):
-    conn = get_conn()
-    if not conn: return pd.DataFrame()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT churn_prob, is_churn, contract, internet,
-                       monthly_charges, tenure_months, payment_method, predicted_at
-                FROM predictions
-                WHERE customer_id = %s
-                ORDER BY predicted_at DESC
-            """, (customer_id,))
-            rows = cur.fetchall()
-        return pd.DataFrame(rows) if rows else pd.DataFrame()
-    finally:
-        conn.close()
 
 def render():
     st.title("👤 고객 상세 프로필")
@@ -55,21 +39,58 @@ def render():
         st.write("")
         search_btn = st.button("🔍 조회", use_container_width=True, type="primary")
 
-    if not search_btn and 'profile_customer' not in st.session_state:
+    # ── 검색 버튼 클릭 시 결과 저장 ──────────────
+    if search_btn and search_id.strip():
+        df_all = load_table(selected_table)
+        if df_all.empty:
+            st.error("테이블 데이터를 불러올 수 없습니다.")
+            return
+        id_col = next((c for c in df_all.columns
+                       if c.lower().replace(' ','').replace('_','') == 'customerid'), None)
+        if not id_col:
+            st.error("CustomerID 컬럼을 찾을 수 없습니다.")
+            return
+        result = df_all[df_all[id_col].astype(str).str.contains(search_id.strip(), case=False, na=False)]
+        if result.empty:
+            st.error(f"'{search_id}' 에 해당하는 고객을 찾을 수 없습니다.")
+            return
+        # 검색 결과를 session_state에 저장 (rerun 후에도 유지)
+        st.session_state['profile_results']   = result.reset_index(drop=True)
+        st.session_state['profile_id_col']    = id_col
+        st.session_state['profile_selected']  = None  # 선택 초기화
+        if 'profile_customer' in st.session_state:
+            del st.session_state['profile_customer']
+        if 'profile_id' in st.session_state:
+            del st.session_state['profile_id']
+
+    # ── 검색 결과 없으면 안내 ─────────────────────
+    if 'profile_results' not in st.session_state:
         st.info("고객 ID를 입력하고 조회 버튼을 클릭하세요.")
         return
 
-    if search_btn and search_id.strip():
-        df_all = load_table(selected_table)
-        id_col = next((c for c in df_all.columns if c.lower() == 'customerid'), None)
-        if id_col:
-            result = df_all[df_all[id_col].astype(str).str.contains(search_id.strip(), case=False, na=False)]
-            if not result.empty:
-                st.session_state['profile_customer'] = result.iloc[0].to_dict()
-                st.session_state['profile_id'] = result.iloc[0][id_col]
-            else:
-                st.error(f"'{search_id}' 에 해당하는 고객을 찾을 수 없습니다.")
-                return
+    # ── 검색 결과 테이블 (행 클릭으로 선택) ──────
+    result = st.session_state['profile_results']
+    id_col = st.session_state['profile_id_col']
+
+    show_cols = [c for c in [id_col, 'Contract', 'Internet Service',
+                              'Monthly Charges', 'Tenure Months', 'Churn Label']
+                 if c in result.columns]
+    st.markdown(f"**{len(result):,}명 검색됨 — 행을 클릭하여 고객을 선택하세요**")
+
+    sel = st.dataframe(
+        result[show_cols],
+        use_container_width=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        hide_index=True
+    )
+
+    # 행 클릭 시 session_state에 저장 (rerun 후에도 유지됨)
+    if sel and sel.selection.rows:
+        row_idx = sel.selection.rows[0]
+        st.session_state['profile_customer'] = result.iloc[row_idx].to_dict()
+        st.session_state['profile_id']       = str(result.iloc[row_idx][id_col])
+        st.session_state['profile_selected'] = row_idx
 
     if 'profile_customer' not in st.session_state:
         return

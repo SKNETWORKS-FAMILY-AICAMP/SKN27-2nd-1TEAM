@@ -1,16 +1,13 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'utils'))
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
-import io
 
-DATA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
+DATA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data"))
 DATA_PATH = os.path.join(DATA_DIR, "Telco_customer_churn - Telco_Churn.csv")
 
 @st.cache_data
@@ -59,60 +56,17 @@ def render():
     df_churn = df_churn[df_churn['Churn Reason'].notna()]
     df_churn['이탈 대분류'] = df_churn['Churn Reason'].apply(categorize_reason)
 
-    tab1, tab2, tab3 = st.tabs(["☁️ 워드클라우드", "📊 대분류 분석", "🔍 상세 사유 분석"])
+    tab1, tab2 = st.tabs(["📊 대분류 분석", "🔍 상세 사유 분석"])
 
-    # ── TAB 1: 워드클라우드 ───────────────────────
+    k1, k2, k3 = st.columns(3)
+    k1.metric("이탈 고객 수",   f"{len(df_churn):,}명")
+    k2.metric("사유 기록 건수", f"{df_churn['Churn Reason'].notna().sum():,}건")
+    k3.metric("고유 사유 수",   f"{df_churn['Churn Reason'].nunique():,}개")
+
+    st.markdown("---")
+
+    # ── TAB 1: 대분류 분석 ────────────────────────
     with tab1:
-        st.subheader("이탈 사유 워드클라우드")
-
-        k1, k2, k3 = st.columns(3)
-        k1.metric("이탈 고객 수",     f"{len(df_churn):,}명")
-        k2.metric("사유 기록 건수",   f"{df_churn['Churn Reason'].notna().sum():,}건")
-        k3.metric("고유 사유 수",     f"{df_churn['Churn Reason'].nunique():,}개")
-
-        st.markdown("---")
-
-        col_l, col_r = st.columns(2)
-
-        with col_l:
-            st.markdown("**전체 이탈 사유 워드클라우드**")
-            text = ' '.join(df_churn['Churn Reason'].dropna().tolist())
-            wc   = WordCloud(
-                width=600, height=400,
-                background_color='white',
-                colormap='Reds',
-                max_words=100
-            ).generate(text)
-            fig, ax = plt.subplots(figsize=(8,5))
-            ax.imshow(wc, interpolation='bilinear')
-            ax.axis('off')
-            fig.patch.set_alpha(0)
-            st.pyplot(fig)
-            plt.close()
-
-        with col_r:
-            st.markdown("**대분류별 워드클라우드**")
-            category = st.selectbox("대분류 선택",
-                                    df_churn['이탈 대분류'].unique().tolist())
-            sub_text = ' '.join(
-                df_churn[df_churn['이탈 대분류']==category]['Churn Reason'].tolist()
-            )
-            if sub_text.strip():
-                wc2 = WordCloud(
-                    width=600, height=400,
-                    background_color='white',
-                    colormap='Blues',
-                    max_words=50
-                ).generate(sub_text)
-                fig2, ax2 = plt.subplots(figsize=(8,5))
-                ax2.imshow(wc2, interpolation='bilinear')
-                ax2.axis('off')
-                fig2.patch.set_alpha(0)
-                st.pyplot(fig2)
-                plt.close()
-
-    # ── TAB 2: 대분류 분석 ────────────────────────
-    with tab2:
         st.subheader("이탈 사유 대분류 분석")
 
         cat_stats = df_churn['이탈 대분류'].value_counts().reset_index()
@@ -152,8 +106,8 @@ def render():
         fig.update_layout(height=350)
         st.plotly_chart(fig, use_container_width=True)
 
-    # ── TAB 3: 상세 사유 분석 ─────────────────────
-    with tab3:
+    # ── TAB 2: 상세 사유 분석 ─────────────────────
+    with tab2:
         st.subheader("상세 이탈 사유 분석")
 
         col1, col2 = st.columns(2)
