@@ -1,58 +1,13 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'utils'))
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-from db_utils import get_conn, load_predictions_raw
-from email_utils import send_alert
+from db_utils import load_predictions_raw, save_alert, load_alerts
+from email_utils import send_alert, send_alert_bulk
 
 def get_alerts():
-    conn = get_conn()
-    if not conn: return pd.DataFrame()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT customer_id, churn_prob, alert_type,
-                       sent_to, is_sent, sent_by, note, sent_at
-                FROM alerts
-                ORDER BY sent_at DESC
-                LIMIT 200
-            """)
-            rows = cur.fetchall()
-        if not rows: return pd.DataFrame()
-        df = pd.DataFrame(rows)
-        df = df.rename(columns={
-            'customer_id': '고객 ID',
-            'churn_prob' : '이탈 확률',
-            'alert_type' : '알림 유형',
-            'sent_to'    : '수신자',
-            'is_sent'    : '발송 성공',
-            'sent_by'    : '발송자',
-            'note'       : '메모',
-            'sent_at'    : '발송 시간',
-        })
-        df['이탈 확률'] = (df['이탈 확률']*100).round(1).astype(str) + '%'
-        df['발송 성공'] = df['발송 성공'].apply(lambda x: '✅ 성공' if x==1 else '❌ 실패')
-        return df
-    finally:
-        conn.close()
-
-def save_alert(customer_id, churn_prob, sent_to, is_sent, sent_by, note=''):
-    conn = get_conn()
-    if not conn: return
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO alerts
-                (customer_id, churn_prob, alert_type, sent_to, is_sent, sent_by, note, sent_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (customer_id, churn_prob, '이메일', sent_to,
-                  1 if is_sent else 0, sent_by, note,
-                  datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        conn.commit()
-    finally:
-        conn.close()
+    return load_alerts()
 
 def render():
     st.title("🔔 알림 센터")
@@ -95,6 +50,7 @@ def render():
         st.dataframe(df_show, use_container_width=True, hide_index=True)
 
         st.markdown("---")
+        note = st.text_input("메모 (선택)", placeholder="긴급 리텐션 캠페인 대상")
         col_a, col_b = st.columns(2)
 
         with col_a:
@@ -102,30 +58,30 @@ def render():
                 if not recv_email:
                     st.error("수신자 이메일을 입력하세요.")
                 else:
-                    success = 0
-                    with st.spinner(f"{len(df_target)}명 알림 발송 중..."):
+                    with st.spinner(f"{len(df_target)}명 알림 이메일 1개로 발송 중..."):
+                        customers = df_target.to_dict('records')
+                        ok = send_alert_bulk(
+                            customers=customers,
+                            to_email=recv_email,
+                            sender_name=sender_name or '담당자',
+                            note=note
+                        )
+                        # 이력 저장
                         for _, row in df_target.iterrows():
-                            ok = send_alert(
-                                customer_name=row['customer_id'],
-                                customer_id=row['customer_id'],
-                                churn_prob=float(row['churn_prob']),
-                                contract=row.get('contract',''),
-                                monthly_charges=float(row.get('monthly_charges',0)),
-                                tenure_months=int(row.get('tenure_months',0)),
-                                to_email=recv_email
-                            )
                             save_alert(
                                 customer_id=row['customer_id'],
                                 churn_prob=float(row['churn_prob']),
                                 sent_to=recv_email,
                                 is_sent=ok,
-                                sent_by=sender_name or '담당자'
+                                sent_by=sender_name or '담당자',
+                                note=note
                             )
-                            if ok: success += 1
-                    st.success(f"✅ {success}/{len(df_target)}건 발송 완료!")
+                    if ok:
+                        st.success(f"✅ 이메일 1개로 {len(df_target)}명 정보 발송 완료!")
+                    else:
+                        st.error("발송 실패 — 터미널 로그를 확인하세요.")
 
         with col_b:
-            note = st.text_input("메모 (선택)", placeholder="긴급 리텐션 캠페인 대상")
             if st.button("📋 발송 없이 이력만 기록", use_container_width=True):
                 for _, row in df_target.iterrows():
                     save_alert(

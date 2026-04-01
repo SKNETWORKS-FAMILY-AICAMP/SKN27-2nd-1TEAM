@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'utils'))
 
 import streamlit as st
 import pandas as pd
@@ -8,7 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from scipy import stats
 
-DATA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
+DATA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data"))
 DATA_PATH = os.path.join(DATA_DIR, "Telco_customer_churn - Telco_Churn.csv")
 
 @st.cache_data
@@ -100,21 +100,20 @@ def render():
     with tab3:
         st.subheader("변수 심층 분석")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            x_var = st.selectbox("X축 변수", [c for c in num_cols if c != 'Churn Value'])
-        with col2:
-            y_var = st.selectbox("Y축 변수", [c for c in num_cols if c != x_var],
-                                 index=1 if len(num_cols) > 1 else 0)
+        # Y축 Churn Value 고정
+        x_var = st.selectbox("X축 변수 선택", [c for c in num_cols if c != 'Churn Value'])
+        y_var = 'Churn Value'
+        st.caption("Y축은 이탈 여부(Churn Value)로 고정됩니다.")
 
         fig = px.scatter(df, x=x_var, y=y_var,
                          color='Churn Value',
                          color_continuous_scale=['#4CAF50','#F44336'],
                          opacity=0.5, height=400,
-                         title=f'{x_var} vs {y_var} (이탈 여부)')
-        fig.update_layout(coloraxis_colorbar=dict(
-            tickvals=[0,1], ticktext=['유지','이탈']
-        ))
+                         title=f'{x_var} vs 이탈 여부')
+        fig.update_layout(
+            yaxis_title='이탈 여부 (0=유지, 1=이탈)',
+            coloraxis_colorbar=dict(tickvals=[0,1], ticktext=['유지','이탈'])
+        )
         st.plotly_chart(fig, use_container_width=True)
 
         # t-test
