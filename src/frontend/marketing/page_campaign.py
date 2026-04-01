@@ -1,53 +1,19 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'utils'))
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
-from db_utils import get_conn, load_table, get_tables
+from db_utils import create_campaign, load_campaigns, update_campaign_status
 
-DATA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
+DATA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data"))
 DATA_PATH = os.path.join(DATA_DIR, "Telco_customer_churn - Telco_Churn.csv")
 
 def get_campaigns():
-    conn = get_conn()
-    if not conn: return pd.DataFrame()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM campaigns ORDER BY created_at DESC")
-            rows = cur.fetchall()
-        return pd.DataFrame(rows) if rows else pd.DataFrame()
-    finally:
-        conn.close()
+    return load_campaigns()
 
-def create_campaign(name, ctype, target_count, discount_rate, cost_per):
-    conn = get_conn()
-    if not conn: return False
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO campaigns
-                (campaign_name, campaign_type, target_count, discount_rate, cost_per, status, created_at)
-                VALUES (%s, %s, %s, %s, %s, '진행중', %s)
-            """, (name, ctype, target_count, discount_rate, cost_per,
-                  datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        conn.commit()
-        return True
-    finally:
-        conn.close()
-
-def update_campaign_status(campaign_id, status):
-    conn = get_conn()
-    if not conn: return
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE campaigns SET status=%s WHERE id=%s", (status, campaign_id))
-        conn.commit()
-    finally:
-        conn.close()
 
 @st.cache_data
 def load_raw():

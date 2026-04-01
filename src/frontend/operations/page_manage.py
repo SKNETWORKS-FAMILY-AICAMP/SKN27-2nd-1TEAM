@@ -1,58 +1,18 @@
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'utils'))
+
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os
 from ml_utils import load_ml_objects, create_engineered_features
+from db_utils import get_conn, get_tables, load_table
 
-import pymysql
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "data"))
 
-DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "00_data"))
-
-def get_db_connection():
-    try:
-        conn = pymysql.connect(
-            host='127.0.0.1',
-            port=3307,
-            user='root',
-            password='1234',
-            database='churn_db',
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        return conn
-    except Exception as e:
-        st.error(f"DB 연결 실패: {e}")
-        return None
-
-def get_tables(conn):
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SHOW TABLES")
-            tables = cursor.fetchall()
-            return [list(t.values())[0] for t in tables]
-    except Exception as e:
-        st.error(f"테이블 조회 실패: {e}")
-        return []
-
-@st.cache_data(show_spinner=False)
-def load_data_from_db(table_name):
-    conn = get_db_connection()
-    if not conn: return pd.DataFrame()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(f"SELECT * FROM `{table_name}`")
-            rows = cursor.fetchall()
-            df = pd.DataFrame(rows)
-            return df
-    except Exception as e:
-        st.error(f"데이터 로딩 실패: {e}")
-        return pd.DataFrame()
-    finally:
-        if conn:
-            conn.close()
 
 @st.cache_data(show_spinner=False)
 def get_batch_predictions(table_name):
-    df = load_data_from_db(table_name)
+    df = load_table(table_name)
     if df.empty:
         return None
         
@@ -125,11 +85,11 @@ def render():
     st.markdown("---")
     
     # DB 연결 및 테이블 목록 가져오기
-    conn = get_db_connection()
+    conn = get_conn()
     db_tables = []
     if conn:
-        db_tables = get_tables(conn)
-        conn.close()
+        db_tables = get_tables()
+        
         
     st.subheader("DB 데이터베이스 선택")
     

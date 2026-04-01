@@ -1,43 +1,10 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'utils'))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'utils'))
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-from db_utils import get_conn, get_tables, load_table
+from db_utils import get_tables, load_table, insert_customer, update_customer
 
-def insert_customer(data: dict, table_name: str) -> bool:
-    conn = get_conn()
-    if not conn: return False
-    try:
-        cols = ', '.join([f'`{k}`' for k in data.keys()])
-        vals = ', '.join(['%s'] * len(data))
-        with conn.cursor() as cur:
-            cur.execute(f"INSERT INTO `{table_name}` ({cols}) VALUES ({vals})",
-                        list(data.values()))
-        conn.commit()
-        return True
-    except Exception as e:
-        st.error(f"저장 실패: {e}")
-        return False
-    finally:
-        conn.close()
-
-def update_customer(customer_id: str, data: dict, table_name: str, id_col: str) -> bool:
-    conn = get_conn()
-    if not conn: return False
-    try:
-        set_clause = ', '.join([f'`{k}`=%s' for k in data.keys()])
-        with conn.cursor() as cur:
-            cur.execute(f"UPDATE `{table_name}` SET {set_clause} WHERE `{id_col}`=%s",
-                        list(data.values()) + [customer_id])
-        conn.commit()
-        return True
-    except Exception as e:
-        st.error(f"수정 실패: {e}")
-        return False
-    finally:
-        conn.close()
 
 def render():
     st.title("📝 고객 등록 / 수정")
