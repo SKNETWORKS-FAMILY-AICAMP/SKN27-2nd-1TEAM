@@ -61,8 +61,37 @@ def render():
     st.title("AI 예측 모델 성능 지표 (Model Metrics)")
     st.markdown("현업 부서의 신뢰를 확보하기 위해, 모델의 객관적인 성능을 투명하게 공개합니다.")
     
-    with st.spinner("최신 모델 지표를 동적으로 측정 중입니다..."):
-        auc, acc, threshold, cm = get_dynamic_metrics()
+    st.markdown("### 🔍 모델 선택")
+    model_choice = st.radio(
+        "성능을 확인할 모델을 선택하세요:",
+        ("팀 통합 예측 모델 (Stacking)", "KPJ 실험 파생 모델 (CatBoost)"),
+        horizontal=True
+    )
+    
+    if model_choice == "KPJ 실험 파생 모델 (CatBoost)":
+        with st.spinner("KPJ 모델(.pkl)을 불러와 성능을 동적으로 측정 중입니다..."):
+            import sys
+            import os
+            kpj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'notebook', 'kpj'))
+            if kpj_path not in sys.path:
+                sys.path.append(kpj_path)
+            
+            try:
+                from PJmodel import get_kpj_dynamic_metrics
+                @st.cache_data
+                def load_kpj_metrics():
+                    return get_kpj_dynamic_metrics()
+                
+                auc, acc, threshold, cm = load_kpj_metrics()
+                if auc is None:
+                    st.error("❗ KPJ 모델(.pkl) 파일을 찾을 수 없습니다. (모델이 학습되지 않았음)")
+                    st.stop()
+            except ImportError as e:
+                st.error(f"KPJ 모듈을 불러오는 중 문제가 발생했습니다: {e}")
+                st.stop()
+    else:
+        with st.spinner("통합 모델 지표를 동적으로 측정 중입니다..."):
+            auc, acc, threshold, cm = get_dynamic_metrics()
     
     metric_col1, metric_col2, metric_col3 = st.columns(3)
     metric_col1.metric("AUC Score (예측 정확도)", f"{auc:.4f}", "전체 데이터 예측 결과")
