@@ -208,7 +208,9 @@ SKN27-2nd-1TEAM/
 * **통제 사유:** 모델의 학습 안정성을 확보하기 위해 모든 피처를 평균 0, 표준편차 1로 정규화했습니다. 데이터 무결성 유지를 위해 훈련 데이터(`X_train`)에만 `fit_transform`을 수행하고, 테스트 데이터(`X_test`)에는 훈련 데이터의 분포 기준을 엄격히 종속시켜 `transform`만 적용했습니다.
 ---
 ## ERD
-ERD 이미지 와 간결한 설명
+![title](https://postfiles.pstatic.net/MjAyNjA0MDJfMTA3/MDAxNzc1MDg4ODE1OTc4.OI2r_NSBDI9tnkzfpQAALigloFzcQ6wUNngfWfk4SRgg.8rQ8y_Bnac2-M4VyI23tkh6g6UrtYYWulIUugiLIFYQg.PNG/erd.png?type=w966)  
+설명 추가 요망
+
 ---
 ## 피처 엔지니어링
 모델의 추론 정확도를 위해 다음과같은 피처를 생성 하여 적용하였습니다  
