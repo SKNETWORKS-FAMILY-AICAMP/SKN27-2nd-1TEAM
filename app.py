@@ -236,42 +236,7 @@ if modules_loaded:
 
         st.markdown("---")
         st.caption("SKN27-2nd-1TEAM")
-        st.caption("Model: Stacking (AUC 0.85)")
         
-        st.markdown("---")
-        if st.button("🚀 가이드 투어 시작", use_container_width=True):
-            import tour
-            tour_steps = [
-                {
-                    "element": "section[data-testid='stSidebar']",
-                    "popover": {
-                        "title": "내비게이션 사이드바",
-                        "description": "이곳에서 팀을 선택하고 다양한 지표/분석 메뉴로 이동할 수 있습니다.",
-                        "side": "right",
-                        "align": "start"
-                    }
-                },
-                {
-                    "element": "div[data-testid='stSelectbox']",
-                    "popover": {
-                        "title": "팀 선택",
-                        "description": "운영팀, 마케팅팀 등 자신에게 맞는 뷰를 선택해 보세요.",
-                        "side": "right",
-                        "align": "start"
-                    }
-                },
-                {
-                    "element": "section.main",
-                    "popover": {
-                        "title": "메인 대시보드",
-                        "description": "선택한 메뉴에 따른 데이터 분석 결과와 인사이트가 여기에 표시됩니다.",
-                        "side": "bottom",
-                        "align": "start"
-                    }
-                }
-            ]
-            # 버튼 클릭 시에만 즉시 자바스크립트 주입
-            tour.run_tour(tour_steps)
 
     if menu in PAGE_ROUTES:
         PAGE_ROUTES[menu]()
