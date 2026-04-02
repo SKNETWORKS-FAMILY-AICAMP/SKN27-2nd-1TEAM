@@ -28,7 +28,7 @@ def render():
         st.error("데이터 파일을 찾을 수 없습니다.")
         return
 
-    tab1, tab2, tab3, tab4 = st.tabs(["🔴 타겟 선정", "📣 캠페인 기획", "⏰ 케어 플랜", "📊 ROI 계산"])
+    tab1, tab2, tab3 = st.tabs(["🔴 타겟 선정", "⏰ 케어 플랜", "📊 ROI 계산"])
 
     # ── TAB 1: 타겟 선정 ──────────────────────────────
     with tab1:
@@ -72,53 +72,10 @@ def render():
             st.download_button("📥 타겟 고객 다운로드",
                                csv, f"target_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
 
-    # ── TAB 2: 캠페인 기획 ───────────────────────────
+    # ── TAB 2: 케어 플랜 ──────────────────────────────
     with tab2:
-        st.subheader("EDA 기반 맞춤 캠페인")
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-            n = len(df[(df['Contract']=='Month-to-month') &
-                       (df['Internet Service']=='Fiber optic') &
-                       (df['Tenure Months']<=12)])
-            st.error("#### 🔴 캠페인 A — 긴급 리텐션")
-            st.markdown(f"""
-**대상** Month-to-month + Fiber + 12개월 이하  
-**근거** 이탈률 65%+ / 6개월 골든타임  
-**액션** 1년 약정 전환 시 3개월 30% 할인  
-**비용** 고객당 $50~70  
-**대상 고객** {n:,}명
-            """)
-
-        with c2:
-            n = len(df[(df['Payment Method']=='Electronic check') &
-                       (df['Contract']=='Month-to-month')])
-            st.warning("#### 🟡 캠페인 B — 자동결제 전환")
-            st.markdown(f"""
-**대상** Electronic check + Month-to-month  
-**근거** Electronic check 이탈률 45%  
-**액션** 자동결제 전환 시 월 5% 영구 할인  
-**비용** 고객당 월 $3~5  
-**대상 고객** {n:,}명
-            """)
-
-        with c3:
-            se = ['Online Security','Online Backup','Device Protection','Tech Support']
-            n  = len(df[(df['Internet Service']=='Fiber optic') &
-                        (df[se].eq('Yes').sum(axis=1) <= 1)])
-            st.success("#### 🟢 캠페인 C — 부가서비스 Lock-in")
-            st.markdown(f"""
-**대상** Fiber optic + 보안서비스 0~1개  
-**근거** 서비스 6개 고객 이탈률 8%  
-**액션** Online Security 3개월 무료 체험  
-**비용** 고객당 $15  
-**대상 고객** {n:,}명
-            """)
-
-    # ── TAB 3: 케어 플랜 ──────────────────────────────
-    with tab3:
         st.subheader("가입 초기 6개월 골든타임 케어 플랜")
-        st.caption("생존 분석 결과: 가입 후 6개월 이내 이탈 위험이 가장 높습니다.")
+        st.caption("고객 유지율 분석 결과, 가입 후 6개월 이내 이탈 위험이 가장 높습니다. 아래 차트는 시점별 이탈 위험도를 보여주며, 표는 각 시점에 마케팅팀이 실행해야 할 구체적인 액션과 채널을 정리한 것입니다.")
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
@@ -146,9 +103,11 @@ def render():
         })
         st.dataframe(care, use_container_width=True, hide_index=True)
 
-    # ── TAB 4: ROI 계산 ──────────────────────────────
-    with tab4:
+    # ── TAB 3: ROI 계산 ──────────────────────────────
+    with tab3:
         st.subheader("캠페인 ROI 시뮬레이터")
+        st.caption("캠페인 대상 고객 수, 예상 방어율, 고객당 비용을 입력하면 순이익과 ROI를 자동으로 계산합니다.")
+        st.info("**계산 공식**\n- 방어 인원 = 대상 고객 수 × 방어율\n- 절약 수익 = 방어 인원 × 평균 CLTV ($4,149)\n- 총 비용 = 대상 고객 수 × 고객당 비용\n- 순이익 = 절약 수익 - 총 비용\n- ROI = 순이익 / 총 비용 × 100%")
 
         c1, c2 = st.columns(2)
         with c1:
